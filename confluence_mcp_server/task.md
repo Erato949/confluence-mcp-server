@@ -33,7 +33,7 @@
     *   [x] Create `tests/test_get_spaces_tool.py`.
     *   [x] Implement automated tests for the `get_spaces` tool in `tests/test_get_spaces_tool.py` covering:
         *   [x] Successful execution with no inputs.
-        *   [ ] Successful execution with `limit` parameter.
+        *   [x] Successful execution with `limit` parameter.
         *   [ ] Successful execution with `start` parameter.
         *   [ ] Successful execution with `space_ids` parameter (list of space IDs).
         *   [ ] Successful execution with `space_keys` parameter (list of space keys).
@@ -44,9 +44,10 @@
         *   [ ] Behavior when no spaces match the filter criteria.
     *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pytest.ini` as it's internal to Starlette).
 *   **`Get_Page` Action:**
-    *   [ ] Define `Get_Page` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `get_page_logic` function in `mcp_actions/page_actions.py`
-    *   [ ] Integrate `Get_Page` into `main.py`'s `execute_tool`
+    *   [x] Define `Get_Page` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `get_page_logic` function in `mcp_actions/page_actions.py`
+    *   [x] Integrate `Get_Page` into `main.py`'s `execute_tool`
+    *   [x] Create `tests/test_get_page_tool.py` and implement automated tests for `Get_Page` tool.
 *   **`search_pages` Action:**
     *   [ ] Define `search_pages` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `search_pages_logic` function in `mcp_actions/page_actions.py`
@@ -77,6 +78,7 @@
     *   [ ] Integrate `add_attachment` into `main.py`'s `execute_tool`
 
 ## Phase 4: Testing, Refinement & Documentation
+*   [x] Set up GitHub repository and push initial project state.
 *   [ ] Review all code for clarity, efficiency, and error handling
 *   [ ] Add comprehensive comments and docstrings throughout the codebase
 *   [ ] Finalize `README.md` with detailed setup, configuration (including `.env` setup), and usage instructions for each tool.
@@ -84,16 +86,17 @@
 
 ## Phase 5: Test Automation (using pytest and httpx)
 
-*   [ ] Add `pytest` and `httpx` to `requirements.txt`.
-*   [ ] Create `tests/` directory structure (`tests/__init__.py`, `tests/conftest.py`).
-*   [/] Implement a `pytest` fixture in `conftest.py` for an `httpx.AsyncClient` to test the FastAPI app.
+*   [x] Refactor project structure: Moved `tests` directory to project root, updated relative imports in `main.py`, and corrected `pytest.ini` to resolve import errors and ensure all tests pass.
+*   [x] Add `pytest` and `httpx` to `requirements.txt`.
+*   [x] Create `tests/` directory structure (`tests/__init__.py`, `tests/conftest.py`).
+*   [x] Implement a `pytest` fixture in `conftest.py` for an `httpx.AsyncClient` to test the FastAPI app.
 *   [/] Write initial automated tests for basic endpoints in `tests/test_main_endpoints.py`:
-    *   [/] Test `/health` endpoint.
+    *   [x] Test `/health` endpoint.
     *   [/] Test `/tools` endpoint (verify it lists `get_spaces` and its schema).
 *   [ ] Create `tests/test_get_spaces_tool.py`.
 *   [x] Implement automated tests for the `get_spaces` tool in `tests/test_get_spaces_tool.py` covering:
     *   [x] Successful execution with no inputs.
-    *   [ ] Successful execution with `limit` parameter.
+    *   [x] Successful execution with `limit` parameter.
     *   [ ] Successful execution with `start` parameter.
     *   [ ] Successful execution with `space_ids` parameter (list of space IDs).
     *   [ ] Successful execution with `space_keys` parameter (list of space keys).

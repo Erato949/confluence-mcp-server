@@ -7,16 +7,19 @@ from atlassian import Confluence
 from pydantic import ValidationError
 
 # Import schemas from the mcp_actions package
-from mcp_actions.schemas import (
+from .mcp_actions.schemas import (
     MCPToolSchema,
     MCPListToolsResponse,
     MCPExecuteRequest,
     MCPExecuteResponse,
     GetSpacesInput,
-    GetSpacesOutput
+    GetSpacesOutput,
+    GetPageInput, 
+    GetPageOutput 
 )
 # Import tool logic
-from mcp_actions.space_actions import get_spaces_logic
+from .mcp_actions.space_actions import get_spaces_logic
+from .mcp_actions.page_actions import get_page_logic 
 
 # Load environment variables from .env file
 load_dotenv()
@@ -103,10 +106,14 @@ def load_tools():
     )
     AVAILABLE_TOOLS[get_spaces_tool_definition.name] = get_spaces_tool_definition
 
-    # Add other tools here as they are developed
-    # Example:
-    # example_tool = MCPToolSchema(name="example", description="...", input_schema={}, output_schema={})
-    # AVAILABLE_TOOLS[example_tool.name] = example_tool
+    # Define and register the Get_Page tool
+    get_page_tool_definition = MCPToolSchema(
+        name="Get_Page", 
+        description="Retrieves a specific page from Confluence by its ID. Allows optional expansion of page details like content and version.",
+        input_schema=GetPageInput.model_json_schema(),
+        output_schema=GetPageOutput.model_json_schema()
+    )
+    AVAILABLE_TOOLS[get_page_tool_definition.name] = get_page_tool_definition
 
 # Call load_tools at startup to populate AVAILABLE_TOOLS
 load_tools()
@@ -162,10 +169,40 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
             )
             return JSONResponse(content=response_object.model_dump()) 
         
-        # Add elif blocks here for other tools as they are implemented
-        # elif tool_name == "another_tool":
-        #     # ... logic for another_tool ...
-        #     pass
+        elif tool_name == "Get_Page": 
+            try:
+                parsed_inputs = GetPageInput(**inputs)
+            except ValidationError as e:
+                return JSONResponse(content=MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"Input validation failed for tool '{tool_name}': {str(e)}",
+                    error_type="InputValidationError"
+                ).model_dump(), status_code=400)
+            
+            try:
+                tool_output_model = get_page_logic(client=client, inputs=parsed_inputs)
+                response_object = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="success",
+                    outputs=tool_output_model.model_dump()
+                )
+                return JSONResponse(content=response_object.model_dump())
+            except HTTPException as http_exc: 
+                return JSONResponse(content=MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=str(http_exc.detail),
+                    error_type=type(http_exc).__name__ 
+                ).model_dump(), status_code=http_exc.status_code)
+            except Exception as e: 
+                print(f"Error in '{tool_name}' logic: {type(e).__name__} - {e}")
+                return JSONResponse(content=MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"An unexpected error occurred in '{tool_name}' logic.",
+                    error_type="ToolLogicError"
+                ).model_dump(), status_code=500)
 
         else:
             # This case should ideally not be reached if AVAILABLE_TOOLS is accurate
@@ -181,7 +218,7 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
     except HTTPException as http_exc:
         # Handles errors from get_confluence_client() (e.g., client not initialized)
         error_response_obj = MCPExecuteResponse(
-            tool_name=tool_name, # tool_name might not be available if request parsing failed before this
+            tool_name=tool_name, 
             status="error",
             error_message=str(http_exc.detail), 
             error_type="ConfigurationError" 

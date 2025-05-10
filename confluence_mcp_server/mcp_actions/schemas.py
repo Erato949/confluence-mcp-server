@@ -68,3 +68,29 @@ class GetSpacesOutput(BaseModel):
     spaces: List[SpaceSchema] = Field(..., description="A list of Confluence spaces.")
     count: int = Field(..., description="The number of spaces returned in this response.")
     total_available: Optional[int] = Field(None, description="The total number of spaces available on the server matching the query (if known).")
+
+
+# --- Schemas for 'Get_Page' tool ---
+
+class GetPageInput(BaseModel):
+    """
+    Input schema for the Get_Page tool.
+    Requires page_id and allows optional expansion of page details.
+    """
+    page_id: int = Field(..., description="The ID of the Confluence page to retrieve.")
+    expand: Optional[str] = Field(None, description="A comma-separated list of properties to expand on the page object (e.g., 'body.storage,version,space').", examples=["body.storage,version"])
+
+class GetPageOutput(BaseModel):
+    """
+    Output schema for the Get_Page tool.
+    Returns detailed information about a Confluence page.
+    """
+    page_id: int = Field(..., description="The ID of the page.")
+    title: str = Field(..., description="The title of the page.")
+    space_key: str = Field(..., description="The key of the space this page belongs to.")
+    status: str = Field(..., description="The status of the page (e.g., 'current', 'draft').")
+    content: Optional[str] = Field(None, description="The content of the page, typically in storage format. Requires 'body.storage' in expand input.")
+    version: Optional[int] = Field(None, description="The version number of the page. Requires 'version' in expand input.")
+    web_url: str = Field(..., description="The web URL to view the page.")
+    # Add other relevant fields as needed based on common use cases or API response
+    # e.g., author, last_modified_date, etc. if 'history' or other elements are expanded.
