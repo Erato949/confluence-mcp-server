@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 class MCPToolSchema(BaseModel):
     """
@@ -44,10 +44,33 @@ class GetSpacesInput(BaseModel):
     Input schema for the get_spaces tool.
     Allows for optional filtering and pagination.
     """
+    space_ids: Optional[List[int]] = Field(None, description="List of space IDs to retrieve. If provided, other filters (except limit/start for potential future individual call limits) are ignored.", examples=[[123, 456]])
+    space_keys: Optional[List[str]] = Field(None, description="List of space keys to retrieve. If provided, other filters (except limit/start) are ignored.", examples=[["KEY1", "KEY2"]])
+    
     space_type: Optional[str] = Field(None, description="Filter by space type (e.g., 'global', 'personal').", examples=["global"])
+    status: Optional[str] = Field(None, description="Filter by space status (e.g., 'current', 'archived').", examples=["current"])
+    label: Optional[str] = Field(None, description="Filter spaces by a specific label.", examples=["team-space"])
+    favourite: Optional[bool] = Field(None, description="Filter spaces by whether they are marked as favourite.")
+    expand: Optional[List[str]] = Field(None, description="List of properties to expand in the results (e.g., 'description.plain', 'metadata.labels').", examples=[["description.plain"]])
+    
     limit: Optional[int] = Field(None, description="Maximum number of spaces to return.", gt=0, examples=[10])
     start: Optional[int] = Field(None, description="Starting index for pagination (0-based).", ge=0, examples=[0])
-    # We could add more filters like favorite, label etc. later if needed
+
+    @model_validator(mode='before')
+    @classmethod
+    def check_exclusive_filters(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+             return values
+
+        id_filters_present = values.get('space_ids') is not None or values.get('space_keys') is not None
+        
+        general_filter_keys = ['space_type', 'status', 'label', 'favourite']
+        general_filters_present = any(values.get(k) is not None for k in general_filter_keys)
+
+        if id_filters_present and general_filters_present:
+            raise ValueError("Cannot use 'space_ids' or 'space_keys' with other general filters like 'space_type', 'status', 'label', or 'favourite'.")
+        return values
+
 
 class SpaceSchema(BaseModel):
     """

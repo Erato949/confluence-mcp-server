@@ -55,37 +55,48 @@ async def test_get_spaces_no_input_successful(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_spaces_with_limit(client: AsyncClient):
-    """Test successful execution of get_spaces tool with the limit parameter."""
+async def test_get_spaces_with_limit(client: AsyncClient): 
     limit_value = 1
-    mock_spaces_data_full = {
-        "results": [
-            {"id": 123, "key": "SPACE1", "name": "My First Space", "type": "global", "status": "CURRENT"},
-            {"id": 456, "key": "DEV", "name": "Development Space", "type": "global", "status": "CURRENT"},
-            {"id": 789, "key": "PROD", "name": "Production Space", "type": "global", "status": "CURRENT"}
-        ],
-        "start": 0,
-        "limit": 3, # Mock API might return more than requested limit due to its own pagination
-        "size": 3
+    payload = {
+        "tool_name": "get_spaces",
+        "inputs": {"limit": limit_value}
     }
 
-    # Expected output should respect the limit_value applied by our tool's logic
-    expected_limited_spaces = [
+    # Define the full set of spaces the API *could* return
+    all_mock_spaces_data = [
+        {"id": "123", "key": "SPACE1", "name": "My First Space", "type": "global", "status": "CURRENT"},
+        {"id": "456", "key": "DEV", "name": "Development Space", "type": "global", "status": "CURRENT"},
+        {"id": "789", "key": "PROD", "name": "Production Space", "type": "global", "status": "CURRENT"}
+    ]
+
+    # Define a side_effect function for get_all_spaces
+    def mock_get_all_spaces_side_effect(*args, **kwargs):
+        limit = kwargs.get('limit')
+        start = kwargs.get('start', 0) # Default start to 0 if not provided
+        
+        # Slice the data based on start and limit
+        # If limit is None, slice to the end. Python handles None in slices appropriately.
+        end = None if limit is None else start + limit
+        sliced_results = all_mock_spaces_data[start:end]
+        
+        return {
+            "results": sliced_results,
+            "start": start,
+            "limit": limit if limit is not None else len(sliced_results), # API might report requested limit or actual size
+            "size": len(sliced_results),
+            "_links": {}
+        }
+
+    local_mock_confluence_instance = MagicMock()
+    local_mock_confluence_instance.get_all_spaces.side_effect = mock_get_all_spaces_side_effect
+    
+    # Expected output based on the limit
+    expected_output_spaces = [
         SpaceSchema(id=123, key="SPACE1", name="My First Space", type="global", status="CURRENT")
     ]
 
-    mock_confluence_instance = MagicMock()
-    # The actual call to get_all_spaces will use effective_limit_for_fetch
-    # which defaults to inputs.limit if max_results_to_fetch is not set.
-    mock_confluence_instance.get_all_spaces.return_value = mock_spaces_data_full
-
-    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
-        request_payload = {
-            "tool_name": "get_spaces",
-            "inputs": {"limit": limit_value}
-        }
-
-        response = await client.post("/execute", json=request_payload)
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=local_mock_confluence_instance) as mock_get_client:
+        response = await client.post("/execute", json=payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -99,15 +110,419 @@ async def test_get_spaces_with_limit(client: AsyncClient):
         assert len(api_output.spaces) == limit_value
         assert api_output.count == limit_value
         for i, space_out in enumerate(api_output.spaces):
-            assert space_out.id == expected_limited_spaces[i].id
-            assert space_out.key == expected_limited_spaces[i].key
-            assert space_out.name == expected_limited_spaces[i].name
-            assert space_out.type == expected_limited_spaces[i].type
-            assert space_out.status == expected_limited_spaces[i].status
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status
 
-        # get_spaces_logic might call get_all_spaces with limit=limit_value
-        # or it might fetch more and then slice. The most robust check for the mock
-        # is that it was called. The exact args might vary if max_results_to_fetch is involved.
-        # For this test, assuming max_results_to_fetch is not set in inputs, 
-        # effective_limit_for_fetch in get_spaces_logic should be limit_value.
-        mock_confluence_instance.get_all_spaces.assert_called_once_with(limit=limit_value)
+        local_mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            limit=limit_value
+            # No other params expected if not provided in inputs and defaults are None
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_start(client: AsyncClient):
+    """Test successful execution of get_spaces tool with the start parameter."""
+    start_value = 1
+    limit_value = 1 # Keep limit small to easily verify the offset
+
+    # Mock data representing the full list if API was called with start=0, limit=3
+    # However, our test will call it with start=1, limit=1
+    mock_api_response_for_call = {
+        "results": [
+            # This space should be returned if API is called with start=1, limit=1
+            {"id": 456, "key": "DEV", "name": "Development Space", "type": "global", "status": "CURRENT"}
+        ],
+        "start": start_value, # API confirms its start
+        "limit": limit_value, # API confirms its limit
+        "size": 1 # API confirms total size of this specific paginated response
+    }
+
+    # This is what we expect in the final MCP output
+    expected_output_spaces = [
+        SpaceSchema(id=456, key="DEV", name="Development Space", type="global", status="CURRENT")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_all_spaces.return_value = mock_api_response_for_call
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"start": start_value, "limit": limit_value}
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces) # Count should reflect the number of items returned in this batch
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status
+
+        # Assert that get_all_spaces was called with the correct start and limit
+        mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            start=start_value,
+            limit=limit_value
+            # No other params expected if not provided in inputs and defaults are None
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_space_ids(client: AsyncClient):
+    """Test successful execution of get_spaces tool with the space_ids parameter."""
+    space_id_to_fetch = 123
+    mock_space_data = { # Data for a single space, as if fetched by ID
+        "id": space_id_to_fetch, 
+        "key": "SPACE1", 
+        "name": "My Specific Space", 
+        "type": "global", 
+        "status": "CURRENT"
+    }
+
+    # The get_all_spaces when filtered by a single ID might return it in a 'results' list
+    # or it might be a direct object. The atlassian-python-api.get_space(space_id=...)
+    # returns a dict. get_all_spaces is typically for broader queries.
+    # Let's assume our logic iterates and calls get_space for each ID in space_ids.
+    # Or, if get_all_spaces *can* take a list of IDs, we mock that.
+    # The doc for atlassian-python-api's get_all_spaces indicates space_id is singular.
+    # So, the logic in `space_actions.py` would likely loop through `inputs.space_ids`
+    # and call `confluence.get_space(space_id=sid)` for each.
+    # For this test, we will mock `confluence.get_space`.
+
+    expected_output_spaces = [
+        SpaceSchema(id=space_id_to_fetch, key="SPACE1", name="My Specific Space", type="global", status="CURRENT")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    # Mocking get_space as it's more direct for fetching by a single ID
+    mock_confluence_instance.get_space.return_value = mock_space_data
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"space_ids": [space_id_to_fetch]} # Pass as a list, even if one
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces)
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status
+
+        # Assert that get_space was called correctly, not get_all_spaces
+        mock_confluence_instance.get_space.assert_called_once_with(
+            space_id=str(space_id_to_fetch) # API client expects string ID
+        )
+        mock_confluence_instance.get_all_spaces.assert_not_called() # Ensure get_all_spaces wasn't called
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_space_keys(client: AsyncClient):
+    """Test successful execution of get_spaces tool with the space_keys parameter."""
+    space_key_to_fetch = "TESTKEY"
+    mock_space_data = { # Data for a single space, as if fetched by key
+        "id": 789, 
+        "key": space_key_to_fetch, 
+        "name": "My Specific Keyed Space", 
+        "type": "global", 
+        "status": "CURRENT"
+    }
+
+    # Similar to space_ids, the logic in `space_actions.py` should iterate 
+    # through `inputs.space_keys` and call `confluence.get_space(space_key=skey)` for each.
+    # This test will mock `confluence.get_space`.
+
+    expected_output_spaces = [
+        SpaceSchema(id=789, key=space_key_to_fetch, name="My Specific Keyed Space", type="global", status="CURRENT")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_space.return_value = mock_space_data
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"space_keys": [space_key_to_fetch]} # Pass as a list
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces)
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status
+            
+        # Assert that get_space was called correctly
+        mock_confluence_instance.get_space.assert_called_once_with(
+            space_key=space_key_to_fetch
+        )
+        mock_confluence_instance.get_all_spaces.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_space_type(client: AsyncClient):
+    """Test successful execution of get_spaces tool with the space_type parameter."""
+    space_type_value = "personal"
+    mock_spaces_data = {
+        "results": [
+            {"id": 101, "key": "PERS", "name": "Personal Space 1", "type": "personal", "status": "CURRENT"},
+        ],
+        "start": 0,
+        "limit": 1,
+        "size": 1
+    }
+
+    expected_output_spaces = [
+        SpaceSchema(id=101, key="PERS", name="Personal Space 1", type="personal", status="CURRENT")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_all_spaces.return_value = mock_spaces_data
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"space_type": space_type_value, "limit": 1} # Added limit for predictability
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces)
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type # Verify type matches
+            assert space_out.status == expected_output_spaces[i].status
+
+        # Assert that get_all_spaces was called with the correct parameters
+        mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            space_type=space_type_value,
+            limit=1 # Ensure other params passed are as expected
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_space_status(client: AsyncClient):
+    """Test successful execution of get_spaces tool with the space_status parameter."""
+    space_status_value = "archived"
+    mock_spaces_data = {
+        "results": [
+            {"id": 202, "key": "ARCH", "name": "Archived Project Space", "type": "global", "status": "archived"},
+        ],
+        "start": 0,
+        "limit": 1,
+        "size": 1
+    }
+
+    expected_output_spaces = [
+        SpaceSchema(id=202, key="ARCH", name="Archived Project Space", type="global", status="archived")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_all_spaces.return_value = mock_spaces_data
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"status": space_status_value, "limit": 1} # Added limit
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces)
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status # Verify status matches
+
+        # Assert that get_all_spaces was called with the correct parameters    
+        mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            status=space_status_value,
+            limit=1
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_with_combination_of_parameters(client: AsyncClient):
+    """Test successful execution with a combination of limit, space_type, and status."""
+    limit_value = 1
+    space_type_value = "personal"
+    status_value = "current"
+
+    mock_spaces_data = {
+        "results": [
+            {"id": 303, "key": "COMBO", "name": "Combo Personal Current", "type": "personal", "status": "current"},
+        ],
+        "start": 0,
+        "limit": limit_value,
+        "size": 1
+    }
+
+    expected_output_spaces = [
+        SpaceSchema(id=303, key="COMBO", name="Combo Personal Current", type="personal", status="current")
+    ]
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_all_spaces.return_value = mock_spaces_data
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {
+                "limit": limit_value,
+                "space_type": space_type_value,
+                "status": status_value
+            }
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == len(expected_output_spaces)
+        assert api_output.count == len(expected_output_spaces)
+        for i, space_out in enumerate(api_output.spaces):
+            assert space_out.id == expected_output_spaces[i].id
+            assert space_out.key == expected_output_spaces[i].key
+            assert space_out.name == expected_output_spaces[i].name
+            assert space_out.type == expected_output_spaces[i].type
+            assert space_out.status == expected_output_spaces[i].status
+
+        # Assert that get_all_spaces was called with the correct parameters
+        mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            limit=limit_value,
+            space_type=space_type_value,
+            status=status_value
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_invalid_input_type(client: AsyncClient):
+    """Test error handling for invalid input type (e.g., non-integer limit)."""
+    request_payload = {
+        "tool_name": "get_spaces",
+        "inputs": {"limit": "not-an-integer"} # Invalid type for limit
+    }
+
+    # No need to mock Confluence API client as validation should occur before API call
+
+    response = await client.post("/execute", json=request_payload)
+
+    assert response.status_code == 422 # FastAPI/Pydantic validation error
+    response_json = response.json()
+
+    assert "error_message" in response_json 
+    assert response_json.get("error_type") == "InputValidationError"
+    assert response_json.get("status") == "error"
+    assert "limit" in response_json.get("error_message", "") # Check that the error message is about 'limit'
+    assert "Input should be a valid integer" in response_json.get("error_message", "") # Check for Pydantic's message part
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_no_match(client: AsyncClient):
+    """Test behavior when no spaces match the filter criteria."""
+    mock_spaces_data_empty = {
+        "results": [],
+        "start": 0,
+        "limit": 20, # Default limit if none specified by client
+        "size": 0
+    }
+
+    mock_confluence_instance = MagicMock()
+    mock_confluence_instance.get_all_spaces.return_value = mock_spaces_data_empty
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock_confluence_instance) as mock_get_client:
+        request_payload = {
+            "tool_name": "get_spaces",
+            "inputs": {"space_type": "non_existent_type"} # Using a filter likely to yield no results
+        }
+
+        response = await client.post("/execute", json=request_payload)
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        assert response_json["tool_name"] == "get_spaces"
+        assert response_json["status"] == "success"
+        assert "outputs" in response_json
+       
+        api_output = GetSpacesOutput(**response_json["outputs"])
+       
+        assert len(api_output.spaces) == 0
+        assert api_output.count == 0
+
+        mock_confluence_instance.get_all_spaces.assert_called_once_with(
+            space_type="non_existent_type" # Ensure the filter was passed
+        )

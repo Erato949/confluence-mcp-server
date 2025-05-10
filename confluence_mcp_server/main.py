@@ -156,7 +156,7 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
                     status="error",
                     error_message=f"Input validation failed for tool '{tool_name}': {str(e)}",
                     error_type="InputValidationError"
-                ).model_dump(), status_code=400)
+                ).model_dump(), status_code=422)
             
             # Call the specific logic function for get_spaces
             tool_output_model = get_spaces_logic(client=client, inputs=parsed_inputs)
@@ -178,7 +178,7 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
                     status="error",
                     error_message=f"Input validation failed for tool '{tool_name}': {str(e)}",
                     error_type="InputValidationError"
-                ).model_dump(), status_code=400)
+                ).model_dump(), status_code=422)
             
             try:
                 tool_output_model = get_page_logic(client=client, inputs=parsed_inputs)
