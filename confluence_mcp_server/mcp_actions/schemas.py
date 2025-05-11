@@ -98,10 +98,43 @@ class GetSpacesOutput(BaseModel):
 class GetPageInput(BaseModel):
     """
     Input schema for the Get_Page tool.
-    Requires page_id and allows optional expansion of page details.
+    Allows fetching a page either by its ID, or by its space key and title.
     """
-    page_id: int = Field(..., description="The ID of the Confluence page to retrieve.")
+    page_id: Optional[int] = Field(None, description="The ID of the Confluence page to retrieve. Mutually exclusive with space_key/title.")
+    space_key: Optional[str] = Field(None, description="The key of the space where the page resides. Required if page_id is not provided and title is provided.")
+    title: Optional[str] = Field(None, description="The title of the page. Required if page_id is not provided and space_key is provided.")
     expand: Optional[str] = Field(None, description="A comma-separated list of properties to expand on the page object (e.g., 'body.storage,version,space').", examples=["body.storage,version"])
+
+    @model_validator(mode='before')
+    @classmethod
+    def check_page_identifiers(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values 
+
+        page_id = values.get('page_id')
+        space_key = values.get('space_key')
+        title = values.get('title')
+
+        # Ensure values are not just empty strings if provided
+        page_id_provided = page_id is not None
+        space_key_provided = isinstance(space_key, str) and space_key.strip()
+        title_provided = isinstance(title, str) and title.strip()
+
+        if page_id_provided:
+            if space_key_provided or title_provided:
+                raise ValueError("If 'page_id' is provided, 'space_key' and 'title' must not be provided.")
+        elif space_key_provided and title_provided:
+            # This is the valid alternative: space_key and title are provided
+            pass
+        elif space_key_provided and not title_provided:
+            raise ValueError("'title' must be provided if 'space_key' is provided and 'page_id' is not.")
+        elif not space_key_provided and title_provided:
+            raise ValueError("'space_key' must be provided if 'title' is provided and 'page_id' is not.")
+        else:
+            # Neither page_id nor (space_key and title) are provided
+            raise ValueError("Either 'page_id' or both 'space_key' and 'title' must be provided.")
+        
+        return values
 
 class GetPageOutput(BaseModel):
     """

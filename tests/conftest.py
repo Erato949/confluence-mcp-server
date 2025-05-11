@@ -3,11 +3,72 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 import asyncio
+from unittest.mock import MagicMock
 
 # Import the FastAPI app instance. Ensure PYTHONPATH or editable install is set up.
 # For now, assuming pytest is run from the root of Confluence-MCP-Server_Claude
 # or that confluence_mcp_server is otherwise discoverable.
 from confluence_mcp_server.main import app as fastapi_app
+
+# --- Mock Constants for Confluence Tests ---
+MOCK_CONFLUENCE_INSTANCE_URL = "https://feedbackloopai.atlassian.net" # Base instance URL
+MOCK_CONFLUENCE_WEB_BASE_URL = f"{MOCK_CONFLUENCE_INSTANCE_URL}/wiki" # Full base for web links
+
+MOCK_PAGE_ID = 12345
+MOCK_PAGE_TITLE = "Test Page Title"
+MOCK_SPACE_KEY = "TESTSPACE"
+MOCK_PAGE_VERSION = 1 # A generic version number for mocks
+MOCK_PAGE_STATUS = "current"
+
+MOCK_EXPAND_PARAMS = "body.storage,version"
+MOCK_NON_EXISTENT_PAGE_ID = 99999
+MOCK_PAGE_ID_NO_SPACE_TITLE_LOOKUP = 12346 # For specific test scenarios
+
+# New constants for minimal content test
+MOCK_PAGE_ID_MINIMAL_CONTENT = 98765
+MOCK_MINIMAL_PAGE_TITLE = "Minimal Page Title Example"
+MOCK_MINIMAL_SPACE_KEY = "MINSPACEKEY"
+
+# --- Helper Function to Generate Mock Confluence Page Data ---
+def get_mock_confluence_page_data(
+    page_id=MOCK_PAGE_ID, 
+    title=MOCK_PAGE_TITLE, 
+    space_key=MOCK_SPACE_KEY, 
+    expand: str = None, 
+    has_content=True, 
+    has_version=True,
+    version_number=MOCK_PAGE_VERSION
+):
+    """Generates mock Confluence page data similar to API responses."""
+    page_data = {
+        "id": str(page_id), # API usually returns ID as string
+        "title": title,
+        "status": MOCK_PAGE_STATUS,
+        "space": {"key": space_key}, # For space_key extraction
+        "_links": {
+            # This path will be appended to "INSTANCE_URL/wiki"
+            # Format can vary, but this is a common one for web UI links.
+            "webui": f"/spaces/{space_key}/pages/{page_id}/{title.replace(' ', '+')}"
+        }
+    }
+    
+    # Mocking expanded content based on 'expand' string and flags
+    if expand:
+        if "body.storage" in expand:
+            if has_content:
+                # Using a dynamic content string based on title for clarity
+                page_data["body"] = {"storage": {"value": f"<p>Content for page '{title}' (ID: {page_id}).</p>"}}
+            else:
+                page_data["body"] = {"storage": {"value": None}} # Ensure key exists even if no content
+        
+        if "version" in expand:
+            if has_version:
+                page_data["version"] = {"number": version_number}
+            else:
+                page_data["version"] = {"number": None} # Ensure key exists even if no version
+    return page_data
+
+# --- Pytest Fixtures ---
 
 # Custom event_loop fixture removed.
 # Pytest-asyncio will provide the event loop based on the asyncio marker's scope in test files.
@@ -37,3 +98,12 @@ def client(request) -> AsyncClient:
 
     request.addfinalizer(finalizer)
     return ac
+
+@pytest.fixture
+def confluence_client_mock() -> MagicMock:
+    """Provides a MagicMock for the atlassian.Confluence client."""
+    mock = MagicMock()
+    # This URL is used by page_actions.py to construct the full web_url for pages.
+    # It should be the base instance URL, e.g., "https://your-domain.atlassian.net"
+    mock.url = MOCK_CONFLUENCE_INSTANCE_URL 
+    return mock

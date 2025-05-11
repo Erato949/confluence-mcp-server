@@ -46,17 +46,17 @@
     *   [x] Define `Get_Page` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `get_page_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `Get_Page` into `main.py`'s `execute_tool`
-    *   [/] Create `tests/test_get_page_tool.py` and implement automated tests for `Get_Page` tool, covering:
-        *   [ ] Successful execution with valid `page_id`.
-        *   [ ] Successful execution with valid `space_key` and `title`.
-        *   [ ] Error handling: non-existent `page_id`.
-        *   [ ] Error handling: non-existent `space_key` / `title` combination.
-        *   [ ] Error handling: `page_id` provided with `space_key` or `title`.
-        *   [ ] Error handling: `space_key` provided without `title`.
-        *   [ ] Error handling: `title` provided without `space_key`.
-        *   [ ] Error handling: invalid input type for `page_id` (e.g., string).
-        *   [ ] Behavior: page has specific content (verify basic structure).
-        *   [ ] Behavior: page has no content (or minimal default).
+    *   [x] Create `tests/test_get_page_tool.py` and implement automated tests for `Get_Page` tool, covering:
+        *   [x] Successful execution with valid `page_id`.
+        *   [x] Successful execution with valid `space_key` and `title`.
+        *   [x] Error handling: non-existent `page_id`.
+        *   [x] Error handling: non-existent `space_key` / `title` combination.
+        *   [x] Error handling: `page_id` provided with `space_key` or `title`.
+        *   [x] Error handling: `space_key` provided without `title`.
+        *   [x] Error handling: `title` provided without `space_key`.
+        *   [x] Error handling: invalid input type for `page_id` (e.g., string).
+        *   [x] Behavior: page has specific content (verify basic structure).
+        *   [x] Behavior: page has no content (or minimal default).
 *   **`search_pages` Action:**
     *   [ ] Define `search_pages` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `search_pages_logic` function in `mcp_actions/page_actions.py`
@@ -141,6 +141,7 @@
 ## Phase 4: Testing, Refinement & Documentation
 *   [x] Set up GitHub repository and push initial project state.
 *   [x] Pushed get_page tool implementation and test directory normalization to GitHub.
+*   [x] Refactor FastAPI error handling in main.py to return correct HTTP status codes and serialize GetSpacesOutput correctly.
 *   [ ] Review all code for clarity, efficiency, and error handling
 *   [ ] Add comprehensive comments and docstrings throughout the codebase
 *   [ ] Finalize `README.md` with detailed setup, configuration (including `.env` setup), and usage instructions for each tool.
@@ -158,7 +159,8 @@
 *   [x] Implement automated tests for the `get_spaces` tool in `tests/test_get_spaces_tool.py`.
     *   [x] Successful execution with no inputs.
     *   [x] Successful execution with `limit` parameter.
-*   [ ] Research and implement mocking for `atlassian.Confluence` API calls to make tests independent of the live Confluence instance and faster.
-    *   [ ] Apply mocking to `get_spaces` tests.
+*   [x] Research and implement mocking for `atlassian.Confluence` API calls to make tests independent of the live Confluence instance and faster.
+    *   [x] Apply mocking to `get_spaces` tests.
+    *   [x] Apply mocking to `Get_Page` tests.
 *   [ ] Ensure all future tools are developed with corresponding automated tests.
 *   [ ] Integrate test execution into the development workflow (e.g., a simple script or command to run all tests).

@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, APIRouter
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
@@ -120,122 +120,130 @@ load_tools()
 
 
 # --- API Endpoints ---
-@app.get("/health", summary="Health Check", tags=["General"])
+router = APIRouter()
+
+@app.get("/health", status_code=200)
 async def health_check():
     client_status = "initialized" if confluence_client else "not_initialized"
     return {"status": "ok", "message": "Confluence MCP Server is running", "confluence_client_status": client_status}
 
-@app.get("/tools", response_model=MCPListToolsResponse, summary="List Available Tools", tags=["MCP"])
-async def list_tools_endpoint(): 
-    if not AVAILABLE_TOOLS:
-        return MCPListToolsResponse(tools=[])
-    return MCPListToolsResponse(tools=list(AVAILABLE_TOOLS.values()))
-
-@app.post("/execute", summary="Execute a Tool", tags=["MCP"])
-async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)): 
+@router.post("/execute", response_model=MCPExecuteResponse, response_model_exclude_none=True)
+async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
+    client: Confluence
     tool_name = request.tool_name
-    inputs = request.inputs
+    inputs = request.inputs or {}
 
     if tool_name not in AVAILABLE_TOOLS:
-        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found.")
-
-    print(f"Executing tool: {tool_name} with inputs: {inputs}") 
+        error_payload = MCPExecuteResponse(
+            tool_name=tool_name,
+            status="error",
+            error_message=f"Tool '{tool_name}' is not recognized or not available.",
+            error_type="ToolNotFoundError"
+        ).model_dump(exclude_none=True)
+        return JSONResponse(content=error_payload, status_code=404)
 
     try:
-        # Get the Confluence client; this might raise HTTPException if not initialized
         client = get_confluence_client()
 
         if tool_name == "get_spaces":
             try:
-                # Validate and parse inputs using the Pydantic model for get_spaces
                 parsed_inputs = GetSpacesInput(**inputs)
             except ValidationError as e:
-                # Handle Pydantic validation errors (e.g., wrong input type)
-                return JSONResponse(content=MCPExecuteResponse(
+                error_payload = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="error",
                     error_message=f"Input validation failed for tool '{tool_name}': {str(e)}",
                     error_type="InputValidationError"
-                ).model_dump(), status_code=422)
-            
-            # Call the specific logic function for get_spaces
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=422)
+
             tool_output_model = get_spaces_logic(client=client, inputs=parsed_inputs)
-            
-            # Return a success response with the tool's output
             response_object = MCPExecuteResponse(
                 tool_name=tool_name,
                 status="success",
-                outputs=tool_output_model.model_dump() 
+                outputs=tool_output_model.model_dump(exclude_none=True) # Ensure dict and exclude Nones
             )
-            return JSONResponse(content=response_object.model_dump()) 
+            print(f"DEBUG MAIN: Returning MCPExecuteResponse object directly for get_spaces. Model before FastAPI processing: {response_object.model_dump_json(indent=2, exclude_none=False)}")
+            return response_object
         
         elif tool_name == "Get_Page": 
             try:
                 parsed_inputs = GetPageInput(**inputs)
             except ValidationError as e:
-                return JSONResponse(content=MCPExecuteResponse(
+                error_payload = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="error",
                     error_message=f"Input validation failed for tool '{tool_name}': {str(e)}",
                     error_type="InputValidationError"
-                ).model_dump(), status_code=422)
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=422)
             
             try:
                 tool_output_model = get_page_logic(client=client, inputs=parsed_inputs)
                 response_object = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="success",
-                    outputs=tool_output_model.model_dump()
+                    outputs=tool_output_model.model_dump(exclude_none=False) # Keep exclude_none=False as per original intent for Get_Page
                 )
-                return JSONResponse(content=response_object.model_dump())
+                print(f"DEBUG MAIN: Returning MCPExecuteResponse object directly for Get_Page. Model before FastAPI processing: {response_object.model_dump_json(indent=2, exclude_none=False)}")
+                return response_object
             except HTTPException as http_exc: 
-                return JSONResponse(content=MCPExecuteResponse(
+                print(f"DEBUG MAIN: HTTPException caught for Get_Page: {http_exc.status_code} - {http_exc.detail}")
+                error_payload = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="error",
                     error_message=str(http_exc.detail),
                     error_type=type(http_exc).__name__ 
-                ).model_dump(), status_code=http_exc.status_code)
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
             except Exception as e: 
-                print(f"Error in '{tool_name}' logic: {type(e).__name__} - {e}")
-                return JSONResponse(content=MCPExecuteResponse(
+                print(f"DEBUG MAIN: Generic Exception caught for Get_Page: {type(e).__name__} - {str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                error_payload = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="error",
-                    error_message=f"An unexpected error occurred in '{tool_name}' logic.",
+                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
                     error_type="ToolLogicError"
-                ).model_dump(), status_code=500)
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=500)
 
         else:
-            # This case should ideally not be reached if AVAILABLE_TOOLS is accurate
-            # and all registered tools have corresponding logic in this if/elif chain.
-            error_response_obj = MCPExecuteResponse(
+            # This case handles tools that are in AVAILABLE_TOOLS but not explicitly in the if/elif chain.
+            # For robust error handling, this path should also return a JSONResponse with a proper status code.
+            error_payload = MCPExecuteResponse(
                 tool_name=tool_name,
                 status="error",
                 error_message=f"Execution logic for tool '{tool_name}' is not implemented in the /execute endpoint.",
                 error_type="NotImplementedError"
-            )
-            return JSONResponse(content=error_response_obj.model_dump(), status_code=501)
+            ).model_dump(exclude_none=True)
+            return JSONResponse(content=error_payload, status_code=501) # 501 Not Implemented
 
     except HTTPException as http_exc:
-        # Handles errors from get_confluence_client() (e.g., client not initialized)
-        error_response_obj = MCPExecuteResponse(
+        # Handles errors from get_confluence_client() or other top-level HTTPExceptions before tool logic
+        print(f"DEBUG MAIN: Outer HTTPException caught: {http_exc.status_code} - {http_exc.detail}")
+        error_payload = MCPExecuteResponse(
             tool_name=tool_name, 
             status="error",
             error_message=str(http_exc.detail), 
-            error_type="ConfigurationError" 
-        )
-        return JSONResponse(content=error_response_obj.model_dump(), status_code=http_exc.status_code)
+            # Attempt to classify error based on status code, or use a generic type
+            error_type="ServiceConfigurationError" if http_exc.status_code == 503 else type(http_exc).__name__
+        ).model_dump(exclude_none=True)
+        return JSONResponse(content=error_payload, status_code=http_exc.status_code)
     except Exception as e:
-        # Catch-all for other unexpected errors during tool logic execution
-        # It's good to log the full traceback for server-side debugging
-        print(f"Unexpected error during execution of tool '{tool_name}': {type(e).__name__} - {e}")
-        # For the client, return a generic server error message
-        error_response_obj = MCPExecuteResponse(
+        # Catch-all for other unexpected errors during tool dispatch or pre-tool-logic phase
+        print(f"DEBUG MAIN: Outer Generic Exception caught: {type(e).__name__} - {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        error_payload = MCPExecuteResponse(
             tool_name=tool_name,
             status="error",
-            error_message=f"An unexpected server error occurred while executing tool '{tool_name}'.",
+            error_message=f"An unexpected server error occurred while preparing to execute tool '{tool_name}'.",
             error_type="ServerError"
-        )
-        return JSONResponse(content=error_response_obj.model_dump(), status_code=500)
+        ).model_dump(exclude_none=True)
+        return JSONResponse(content=error_payload, status_code=500)
+
+app.include_router(router)
 
 # --- Main entry point for Uvicorn (if running directly) ---
 if __name__ == "__main__":
