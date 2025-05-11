@@ -150,3 +150,46 @@ class GetPageOutput(BaseModel):
     web_url: str = Field(..., description="The web URL to view the page.")
     # Add other relevant fields as needed based on common use cases or API response
     # e.g., author, last_modified_date, etc. if 'history' or other elements are expanded.
+
+
+# --- Schemas for 'search_pages' tool ---
+
+class SearchPagesInput(BaseModel):
+    """
+    Input schema for the search_pages tool.
+    """
+    cql: str = Field(..., description="The Confluence Query Language (CQL) string to execute for the search.", examples=["label = 'global-kb' and type = page"])
+    limit: Optional[int] = Field(25, description="Maximum number of pages to return. Default is 25.", gt=0, examples=[10])
+    start: Optional[int] = Field(0, description="Starting index for pagination (0-based). Default is 0.", ge=0, examples=[0])
+    excerpt: Optional[str] = Field(None, description="The excerpt strategy to use for search results (e.g., 'indexed', 'highlight', 'none').", examples=["highlight"])
+    expand: Optional[str] = Field(None, description="A comma-separated string of properties to expand in the results (e.g., 'body.storage,version', 'space').", examples=["body.storage,version"])
+    # include_archived_spaces: Optional[bool] = Field(None, description="Whether to include archived spaces in the search. Default depends on Confluence setup.") # Not directly in atlassian-python-api cql method, but good to note
+
+class SearchedPageSchema(BaseModel):
+    """
+    Represents a single page found in search results.
+    """
+    page_id: int = Field(..., description="The ID of the page.")
+    title: str = Field(..., description="The title of the page.")
+    space_key: Optional[str] = Field(None, description="The key of the space this page belongs to. May not always be present or expanded in search results directly without 'space' in expand.")
+    status: str = Field(..., description="The status of the page (e.g., 'current', 'draft').")
+    excerpt_highlight: Optional[str] = Field(None, description="The highlighted excerpt of the page content if 'excerpt=highlight' was used.")
+    content: Optional[str] = Field(None, description="The content of the page, typically in storage format. Requires 'body.storage' in expand input.")
+    version: Optional[int] = Field(None, description="The version number of the page. Requires 'version' in expand input.")
+    web_url: str = Field(..., description="The web URL to view the page.")
+    last_modified_date: Optional[str] = Field(None, description="The last modified date of the page (ISO 8601 format string).")
+    # raw_result: Optional[Dict[str, Any]] = Field(None, description="The raw JSON result for this page from Confluence, for debugging or further processing if needed.")
+
+
+class SearchPagesOutput(BaseModel):
+    """
+    Output schema for the search_pages tool.
+    """
+    results: List[SearchedPageSchema] = Field(..., description="A list of Confluence pages matching the search query.")
+    count: int = Field(..., description="The number of pages returned in this specific response (matches 'size' from API).")
+    total_available: Optional[int] = Field(None, description="The total number of pages available on the server matching the query (matches 'totalSize' from API, if available).")
+    cql_query_used: str = Field(..., description="The CQL query that was executed.")
+    limit_used: int = Field(..., description="The limit parameter used for this query.")
+    start_used: int = Field(..., description="The start parameter used for this query.")
+    expand_used: Optional[str] = Field(None, description="The comma-separated string of 'expand' options used for this query.")
+    excerpt_used: Optional[str] = Field(None, description="The 'excerpt' strategy used for this query.")
