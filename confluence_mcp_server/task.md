@@ -58,16 +58,16 @@
         *   [x] Behavior: page has specific content (verify basic structure).
         *   [x] Behavior: page has no content (or minimal default).
 *   **`search_pages` Action:**
-    *   [ ] Define `search_pages` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `search_pages_logic` function in `mcp_actions/page_actions.py`
-    *   [ ] Integrate `search_pages` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `search_pages` tool, covering:
-        *   [ ] Successful execution with a simple CQL query.
-        *   [ ] Successful execution with `limit` and `start` parameters.
-        *   [ ] Successful execution with different `excerpt` strategies.
-        *   [ ] Successful execution with `expand` options (e.g., 'body.storage').
-        *   [ ] Behavior: query returns multiple results.
-        *   [ ] Behavior: query returns no results.
+    *   [x] Define `search_pages` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `search_pages_logic` function in `mcp_actions/page_actions.py`
+    *   [x] Integrate `search_pages` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `search_pages` tool, covering:
+        *   [x] Successful execution with a simple CQL query.
+        *   [x] Successful execution with `limit` and `start` parameters.
+        *   [x] Successful execution with different `excerpt` strategies (e.g., 'highlight').
+        *   [x] Successful execution with `expand` options (e.g., 'body.storage', 'version'). Refactored to use comma-separated string.
+        *   [x] Behavior: query returns multiple results.
+        *   [x] Behavior: query returns no results.
         *   [ ] Error handling: invalid CQL query syntax.
         *   [ ] Error handling: invalid input types for parameters.
 *   **`update_page` Action:**
