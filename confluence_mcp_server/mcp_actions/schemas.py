@@ -252,3 +252,40 @@ class CreatePageOutput(BaseModel):
     version: int = Field(..., description="The initial version number of the newly created page (typically 1).")
     status: str = Field(..., description="The status of the newly created page (e.g., 'current').")
     url: str = Field(..., description="The full web URL to access the newly created page.")
+
+
+# --- Update Page Schemas ---
+
+class UpdatePageInput(BaseModel):
+    """
+    Input schema for the update_page tool.
+    """
+    page_id: str = Field(..., description="The ID of the page to update.")
+    title: Optional[str] = Field(None, min_length=1, description="The new title for the page. If not provided, the title remains unchanged unless content is also not provided (in which case it's an error).")
+    content: Optional[str] = Field(None, description="The new content for the page in Confluence Storage Format (XHTML). If not provided, content remains unchanged.")
+    parent_page_id: Optional[str] = Field(None, description="The ID of the new parent page. If not provided, the parent page remains unchanged.")
+    current_version_number: int = Field(..., gt=0, description="The current version number of the page. This is required for optimistic locking to prevent concurrent edits.")
+
+    @model_validator(mode='after')
+    def check_at_least_one_updatable_field(cls, instance: 'UpdatePageInput') -> 'UpdatePageInput':
+        # For mode='after', 'instance' is the model instance itself.
+        # Access fields directly via attributes.
+        if instance.title is None and \
+           instance.content is None and \
+           instance.parent_page_id is None:
+            raise ValueError("At least one of 'title', 'content', or 'parent_page_id' must be provided to update the page.")
+        return instance
+
+class UpdatePageOutput(BaseModel):
+    """
+    Output schema for the update_page tool, returned upon successful page update.
+    """
+    page_id: str = Field(..., description="The ID of the updated page.")
+    title: str = Field(..., description="The title of the updated page.")
+    space_key: str = Field(..., description="The key of the space containing the page.")
+    version: int = Field(..., description="The new version number of the page after the update.")
+    status: str = Field(..., description="The status of the page (e.g., 'current').")
+    url: str = Field(..., description="The web URL of the page.")
+
+
+# --- Get Comments Schemas ---

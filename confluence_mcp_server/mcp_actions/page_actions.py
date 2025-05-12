@@ -1,7 +1,8 @@
 # confluence_mcp_server/mcp_actions/page_actions.py
 
 from atlassian import Confluence
-from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput, CreatePageInput, CreatePageOutput
+from atlassian.errors import ApiError # Try importing ApiError
+from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput, CreatePageInput, CreatePageOutput, UpdatePageInput, UpdatePageOutput
 from fastapi import HTTPException
 from typing import List, Dict, Any, Optional
 
@@ -350,3 +351,137 @@ def create_page_logic(
                 pass # Fall through to generic error
 
         raise HTTPException(status_code=500, detail=f"Server Error ({error_type}): {error_msg}")
+
+def update_page_logic(
+    client: Confluence,
+    inputs: UpdatePageInput
+) -> UpdatePageOutput:
+    """
+    Logic to update an existing page in Confluence.
+    Requires the current version number for optimistic concurrency control.
+    At least one of title, content, or parent_page_id must be provided.
+    """
+    print(f"DEBUG: update_page_logic called with page_id: {inputs.page_id}, title: {inputs.title is not None}, has_content: {inputs.content is not None}, parent_id: {inputs.parent_page_id}, version: {inputs.current_version_number}")
+
+    try:
+        # The atlassian-python-api's update_page or update_page_by_id 
+        # typically requires page_id, new_title, new_body, next_version_number, 
+        # and potentially parent_id if moving.
+        # It might not directly support changing parent_id in the same call as content/title updates.
+        # For now, let's assume we handle title and content updates.
+        # Moving a page (changing parent_id) might need a separate API call or a different client method.
+        # Let's simplify and focus on title and content for now, and research parent_id update separately if needed.
+
+        # The Confluence API expects the *next* version number when updating.
+        next_version_number = inputs.current_version_number + 1
+
+        # Initialize with input values or None
+        current_title = inputs.title
+        current_body = inputs.content
+        
+        # Fetch current page details only if needed to fill missing title/content
+        if inputs.title is None or inputs.content is None:
+            print(f"DEBUG: Fetching current page {inputs.page_id} to get existing title/content for update.") # Keep DEBUG
+            try:
+                current_page_data = client.get_page_by_id(page_id=inputs.page_id, expand="body.storage,version,space")
+                if inputs.title is None:
+                    # Use .get for safer access in case 'title' key is missing
+                    current_title = current_page_data.get('title')
+                if inputs.content is None:
+                    # Use .get for nested access, defaulting to empty string if any part is missing
+                    current_body = current_page_data.get('body', {}).get('storage', {}).get('value', '')
+                    if current_body == '':
+                         print(f"WARNING: Could not fetch existing body for page {inputs.page_id}, or body was empty. Proceeding with empty content.")
+
+            except Exception as e:
+                print(f"ERROR: Failed to fetch page {inputs.page_id} for update: {e}")
+                # Depending on desired behavior, could re-raise or return error here
+                # For now, if fetch fails, we proceed with potentially None title/body, which might fail at client.update_page
+                # or Pydantic might have already caught issues if inputs were insufficient.
+                # This path is tricky; ideally, if page_id is valid, fetch should work.
+                # If page_id is invalid, get_page_by_id would raise, handled by outer try-except.
+                pass # Or handle more gracefully
+
+        # Prepare parameters for the API call
+        update_params = {
+            "page_id": inputs.page_id,
+            "title": current_title,
+            "body": current_body,
+            "version": next_version_number,
+        }
+
+        # If 'body' is provided (even as an empty string), 'representation' is required.
+        if isinstance(update_params.get("body"), str):
+            update_params["representation"] = "storage"
+
+        if inputs.parent_page_id:
+            update_params['parent_id'] = inputs.parent_page_id
+        
+        # Ensure title is not None
+        if update_params.get("title") is None:
+            raise HTTPException(status_code=500, detail=f"Internal error or failed to fetch page details: title is None before calling update_page for page {inputs.page_id}.")
+        
+        # Ensure body is not None (our logic defaults to "" if not found/provided for update)
+        if update_params.get("body") is None: 
+            raise HTTPException(status_code=500, detail=f"Internal error: body is None before calling update_page for page {inputs.page_id}. This should not happen.")
+
+        # Forcefully add representation if body is a string, right before the call
+        if isinstance(update_params.get("body"), str):
+            update_params["representation"] = "storage"
+        
+        print(f"DEBUG: update_params JUST BEFORE client.update_page call: {update_params}")
+
+        print(f"DEBUG: Calling client.update_page with params: {update_params}")
+        updated_page_response = client.update_page(**update_params)
+        print(f"DEBUG: client.update_page response: {updated_page_response}")
+
+        # Construct the output
+        page_url = get_confluence_page_url(updated_page_response.get('_links', {}).get('webui'), client.url)
+        
+        # The space key might not be directly in update_page response, might need to get it from page_id or existing context if necessary.
+        # Or it might be in _expandable -> space or similar. For now, assume we can get it or it's part of the response.
+        # If not, we might need another client.get_page_by_id call post-update, or pass it through if known.
+        # Let's assume updated_page_data contains enough info or we simplify for now.
+        # Often, the response to an update includes the full representation of the updated resource.
+        space_key = "UNKNOWN" # Placeholder, needs to be correctly sourced
+        if 'space' in updated_page_response and isinstance(updated_page_response['space'], dict) and 'key' in updated_page_response['space']:
+            space_key = updated_page_response['space']['key']
+        elif isinstance(updated_page_response.get('spaceKey'), str):
+             space_key = updated_page_response['spaceKey']
+        else: # Fallback: try to get page details again if spaceKey is missing
+            print(f"DEBUG: Space key not in update response, fetching page {inputs.page_id} for details.")
+            page_details_for_space = client.get_page_by_id(inputs.page_id, expand='space')
+            if 'space' in page_details_for_space and 'key' in page_details_for_space['space']:
+                space_key = page_details_for_space['space']['key']
+
+        response_data = {
+            "page_id": str(updated_page_response["id"]),
+            "title": updated_page_response["title"],
+            "space_key": space_key,
+            "version": updated_page_response["version"]["number"],
+            "status": updated_page_response.get("status", "current"), # Default if not present
+            "url": page_url
+        }
+        return UpdatePageOutput(**response_data)
+
+    except Exception as e:
+        detailed_error_msg = f"Error during page update for page_id {inputs.page_id}: {type(e).__name__} - {str(e)}"
+        print(f"An unexpected error occurred in update_page_logic: {detailed_error_msg}") 
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error updating page in Confluence: Details: {str(e)}"
+        )
+
+# Placeholder for get_confluence_page_url if it's not globally available in this file
+def get_confluence_page_url(webui_link: Optional[str], instance_base_url: str) -> str:
+    if webui_link:
+        # webui_link is usually like "/wiki/spaces/SPACEKEY/pages/PAGEID/Page+Title"
+        # or just "/spaces/SPACEKEY/pages/PAGEID/Page+Title"
+        # We need to ensure it becomes a full URL.
+        # Remove leading "/wiki" if instance_base_url already contains it or if it's not standard
+        if instance_base_url.endswith("/wiki") and webui_link.startswith("/wiki"):
+            webui_link = webui_link[len("/wiki"):]
+        elif not instance_base_url.endswith("/") and not webui_link.startswith("/"):
+            webui_link = "/" + webui_link
+        return f"{instance_base_url.rstrip('/')}{webui_link}"
+    return "URL_NOT_AVAILABLE"

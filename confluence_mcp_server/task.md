@@ -42,7 +42,7 @@
         *   [x] Error handling for invalid input types (e.g., non-integer `limit`).
         *   [x] Behavior when no spaces match the filter criteria.
     *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pytest.ini` as it's internal to Starlette).
-*   **`Get_Page` Action:**
+*   **`Get Page` Action:**
     *   [x] Define `Get_Page` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `get_page_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `Get_Page` into `main.py`'s `execute_tool`
@@ -71,17 +71,17 @@
         *   [x] Error handling: invalid CQL query syntax.
         *   [x] Error handling: invalid input types for parameters.
 *   **`update_page` Action:**
-    *   [ ] Define `update_page` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `update_page_logic` function in `mcp_actions/page_actions.py`
-    *   [ ] Integrate `update_page` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `update_page` tool, covering:
-        *   [ ] Successful execution: updating page title.
-        *   [ ] Successful execution: updating page body content.
-        *   [ ] Successful execution: updating page parent.
-        *   [ ] Successful execution: providing `current_version_number` for conflict resolution.
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: version conflict (if `current_version_number` is stale).
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `update_page` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `update_page_logic` function in `mcp_actions/page_actions.py`
+    *   [x] Integrate `update_page` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `update_page` tool, covering:
+        *   [x] Successful execution: updating page title.
+        *   [x] Successful execution: updating page body content.
+        *   [x] Successful execution: updating page parent.
+        *   [x] Successful execution: providing `current_version_number` for conflict resolution.
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: version conflict (if `current_version_number` is stale).
+        *   [x] Error handling: invalid input types.
 *   **`create_page` Action:**
     *   [ ] Define `create_page` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `create_page_logic` function in `mcp_actions/page_actions.py`
