@@ -68,8 +68,8 @@
         *   [x] Successful execution with `expand` options (e.g., 'body.storage', 'version'). Refactored to use comma-separated string.
         *   [x] Behavior: query returns multiple results.
         *   [x] Behavior: query returns no results.
-        *   [ ] Error handling: invalid CQL query syntax.
-        *   [ ] Error handling: invalid input types for parameters.
+        *   [x] Error handling: invalid CQL query syntax.
+        *   [x] Error handling: invalid input types for parameters.
 *   **`update_page` Action:**
     *   [ ] Define `update_page` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `update_page_logic` function in `mcp_actions/page_actions.py`

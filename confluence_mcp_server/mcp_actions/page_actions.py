@@ -245,7 +245,7 @@ def search_pages_logic(
         return SearchPagesOutput(
             results=processed_results,
             count=len(processed_results), # This is the number of items we successfully processed
-            total_available=api_response.get('totalSize'), # Use totalSize from API if available
+            total_available=api_response.get('size'), # Use size from API (actual key)
             cql_query_used=inputs.cql,
             limit_used=inputs.limit,
             start_used=inputs.start,

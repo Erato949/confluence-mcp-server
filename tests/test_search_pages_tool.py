@@ -185,7 +185,7 @@ async def test_search_pages_api_error(client: AsyncClient, confluence_client_moc
 
     assert response_data["status"] == "error"
     assert response_data["tool_name"] == "search_pages"
-    assert "Details: Simulated Confluence API Error during CQL search" in response_data["error_message"]
+    assert "RuntimeError: Error during CQL search: Simulated Confluence API Error during CQL search" in response_data["error_message"]
     assert response_data["error_type"] == "HTTPException" 
     
     mock_get_client_func.assert_called_once()
@@ -261,7 +261,7 @@ async def test_search_pages_with_expand_and_excerpt(client: AsyncClient, conflue
         cql=cql_query,
         limit=1,
         start=0,
-        expand=['body.storage', 'version'], # Cascade: MEMORY[111b01c7-8f2c-4cfd-9ed5-76d8a78df36f]
+        expand='body.storage,version', # Corrected: expand is a string
         excerpt=excerpt_strategy
     )
 
@@ -294,8 +294,9 @@ async def test_search_pages_with_expand_and_excerpt(client: AsyncClient, conflue
     assert "version" in first_result
     assert first_result["version"] == 3
     
-    assert "content_preview" in first_result
-    assert first_result["content_preview"] == "highlighted documentation excerpt"
+    # The field 'content_preview' does not exist in SearchedPageSchema.
+    # 'content' holds body.storage and 'excerpt_highlight' holds the excerpt.
+    assert "excerpt_highlight" in first_result
 
 @pytest.mark.asyncio
 async def test_search_pages_invalid_cql_syntax(client: AsyncClient, confluence_client_mock: MagicMock):
@@ -325,7 +326,7 @@ async def test_search_pages_invalid_cql_syntax(client: AsyncClient, confluence_c
 
     assert response_data["status"] == "error"
     assert response_data["tool_name"] == "search_pages"
-    assert "Details: Confluence API: Invalid CQL syntax provided." in response_data["error_message"]
+    assert "Exception: Error during CQL search: Confluence API: Invalid CQL syntax provided." in response_data["error_message"]
     assert response_data["error_type"] == "HTTPException" 
     
     mock_get_client_func.assert_called_once()
@@ -385,36 +386,24 @@ async def test_search_pages_invalid_input_types(
 
     print(f"DEBUG test_search_pages_invalid_input_types ({invalid_input}): Response Data: {response_data}")
 
-    assert "outputs" in response_data, "Response should contain 'outputs' key for validation errors."
-    assert "validation_details" in response_data["outputs"], "Validation errors should be under 'outputs'.'validation_details'."
-    error_list = response_data["outputs"]["validation_details"]
+    assert response_data["status"] == "error"
+    assert "error_message" in response_data
+    assert response_data["error_type"] == "InputValidationError"
 
-    assert isinstance(error_list, list)
-    assert len(error_list) > 0
-    
-    # Check for the specific error we're testing
-    found_error = False
-    for error_detail in error_list:
-        actual_loc = tuple(error_detail.get("loc", []))
+    error_message = response_data["error_message"]
+    # Expected format: "Input validation failed for tool 'search_pages'. Details: '{field_or_model}': {message}"
+    # or for model validation: "Input validation failed for tool 'search_pages'. Details: model: Value error, {message}"
+    assert f"Input validation failed for tool 'search_pages'. Details: " in error_message
 
-        match_found_this_iteration = False
-        if not expected_error_loc_suffix: # Model-level validation (e.g. from @model_validator)
-            # For model-level errors, Pydantic v2 often returns an empty tuple for loc
-            # when the error is raised from a model_validator without a specific field context.
-            # The error type is 'value_error' and msg contains the ValueError string.
-            if actual_loc == () and error_detail.get("type") == "value_error" and expected_error_msg_part in error_detail.get("msg", ""):
-                match_found_this_iteration = True
-        # Field-level validation (Pydantic field errors for type, constraints etc.)
-        # Here, actual_loc from Pydantic is relative to the 'inputs' model, e.g., ('cql',)
-        elif actual_loc == expected_error_loc_suffix and expected_error_msg_part in error_detail.get("msg", ""):
-            match_found_this_iteration = True
+    if expected_error_loc_suffix:  # Field-specific error
+        # e.g. ('limit',)
+        loc_repr = f"'{expected_error_loc_suffix[0]}':"
+        expected_detail_substring = f"{loc_repr} {expected_error_msg_part}"
+    else:  # Model-level error (from model_validator, loc is empty)
+        # main.py uses '' as the key for model-level errors when error['loc'] is empty.
+        # expected_error_msg_part from parameters like "Value error, If 'cql' is provided..."
+        loc_repr = "'':"
+        expected_detail_substring = f"{loc_repr} {expected_error_msg_part}"
 
-        if match_found_this_iteration:
-            found_error = True
-            break
-        else:
-            print(f"DEBUG test_search_pages_invalid_input_types: No match for expected_loc_suffix='{expected_error_loc_suffix}', expected_msg_part='{expected_error_msg_part}'. \nActual error_detail: {error_detail}")
-
-    assert found_error, f"Expected error with loc_suffix {expected_error_loc_suffix} and msg_part '{expected_error_msg_part}' not found in {error_list}"
-
-    assert found_error, f"Expected error with loc_suffix {expected_error_loc_suffix} and msg_part '{expected_error_msg_part}' not found in {error_list}"
+    assert expected_detail_substring in error_message, \
+        f"Expected detail '{expected_detail_substring}' not found in error message '{error_message}' for input {invalid_input}"

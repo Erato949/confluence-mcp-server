@@ -15,11 +15,13 @@ from .mcp_actions.schemas import (
     GetSpacesInput,
     GetSpacesOutput,
     GetPageInput, 
-    GetPageOutput 
+    GetPageOutput,
+    SearchPagesInput,
+    SearchPagesOutput
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
-from .mcp_actions.page_actions import get_page_logic 
+from .mcp_actions.page_actions import get_page_logic, search_pages_logic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -115,6 +117,15 @@ def load_tools():
     )
     AVAILABLE_TOOLS[get_page_tool_definition.name] = get_page_tool_definition
 
+    # Define and register the search_pages tool
+    search_pages_tool_definition = MCPToolSchema(
+        name="search_pages",
+        description="Searches for Confluence pages using CQL. Supports pagination, excerpts, and content expansion.",
+        input_schema=SearchPagesInput.model_json_schema(),
+        output_schema=SearchPagesOutput.model_json_schema()
+    )
+    AVAILABLE_TOOLS[search_pages_tool_definition.name] = search_pages_tool_definition
+
 # Call load_tools at startup to populate AVAILABLE_TOOLS
 load_tools()
 
@@ -200,6 +211,52 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
                 print(f"DEBUG MAIN: Generic Exception caught for Get_Page: {type(e).__name__} - {str(e)}")
                 import traceback
                 print(traceback.format_exc())
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
+                    error_type="ToolLogicError"
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=500)
+
+        elif tool_name == "search_pages": 
+            try:
+                parsed_inputs = SearchPagesInput(**inputs)
+            except ValidationError as e:
+                validation_errors = e.errors()
+                error_summary_parts = []
+                for err in validation_errors:
+                    loc_str = " -> ".join(map(str, err.get("loc", [])))
+                    error_summary_parts.append(f"'{loc_str}': {err.get('msg', 'Unknown error')}")
+                error_details_str = "; ".join(error_summary_parts)
+                
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"Input validation failed for tool '{tool_name}'. Details: {error_details_str}",
+                    error_type="InputValidationError",
+                    validation_details=validation_errors
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=422)
+            
+            try:
+                tool_output_model = search_pages_logic(client=client, inputs=parsed_inputs)
+                response_object = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="success",
+                    outputs=tool_output_model.model_dump(exclude_none=True) 
+                )
+                # print(f"DEBUG MAIN: Returning MCPExecuteResponse object for search_pages. Model: {response_object.model_dump_json(indent=2, exclude_none=True)}")
+                return response_object
+            except HTTPException as http_exc: 
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=str(http_exc.detail),
+                    error_type=type(http_exc).__name__ 
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
+            except Exception as e: 
                 error_payload = MCPExecuteResponse(
                     tool_name=tool_name,
                     status="error",

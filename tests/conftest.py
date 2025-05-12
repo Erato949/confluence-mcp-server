@@ -68,6 +68,27 @@ def get_mock_confluence_page_data(
                 page_data["version"] = {"number": None} # Ensure key exists even if no version
     return page_data
 
+# --- Helper Function to Generate Mock Confluence CQL Search Results --- 
+def get_mock_cql_search_results(cql_query: str, results: list, limit: int, start: int, total_size: int):
+    """
+    Generates a mock dictionary structure similar to Confluence API CQL search responses.
+    """
+    mock_response = {
+        "results": results, 
+        "start": start,
+        "limit": limit,
+        "size": total_size, # This represents the total number of results matching the query
+        "_links": {
+            "base": MOCK_CONFLUENCE_WEB_BASE_URL,
+            "context": "/wiki"
+        }
+    }
+    if start + len(results) < total_size:
+        # Simplified next link for pagination indication
+        mock_response["_links"]["next"] = f"/rest/api/content/search?cql={cql_query}&start={start + limit}&limit={limit}"
+    
+    return mock_response
+
 # --- Pytest Fixtures ---
 
 # Custom event_loop fixture removed.

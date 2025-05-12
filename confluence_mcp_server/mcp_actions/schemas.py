@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, validator
 
 class MCPToolSchema(BaseModel):
     """
@@ -158,12 +158,47 @@ class SearchPagesInput(BaseModel):
     """
     Input schema for the search_pages tool.
     """
-    cql: str = Field(..., description="The Confluence Query Language (CQL) string to execute for the search.", examples=["label = 'global-kb' and type = page"])
-    limit: Optional[int] = Field(25, description="Maximum number of pages to return. Default is 25.", gt=0, examples=[10])
+    cql: Optional[str] = Field(None, description="The Confluence Query Language (CQL) string to search with. Provide either this or both space_key_for_cql and title_for_cql.", examples=["label = 'global-kb' and type = page"])
+    space_key_for_cql: Optional[str] = Field(None, description="The key of the space to search within. Must be used with title_for_cql if cql is not provided.", examples=["DEV"])
+    title_for_cql: Optional[str] = Field(None, description="The title of the page to search for. Must be used with space_key_for_cql if cql is not provided.", examples=["API Documentation"])
+    
+    limit: Optional[int] = Field(25, description="Maximum number of pages to return. Default is 25.", gt=0, le=100, examples=[10])
     start: Optional[int] = Field(0, description="Starting index for pagination (0-based). Default is 0.", ge=0, examples=[0])
-    excerpt: Optional[str] = Field(None, description="The excerpt strategy to use for search results (e.g., 'indexed', 'highlight', 'none').", examples=["highlight"])
+    excerpt: Optional[str] = Field(None, description="The excerpt strategy to use for search results (e.g., 'highlight', 'none').", pattern="^(highlight|none)$", examples=["highlight"])
     expand: Optional[str] = Field(None, description="A comma-separated string of properties to expand in the results (e.g., 'body.storage,version', 'space').", examples=["body.storage,version"])
-    # include_archived_spaces: Optional[bool] = Field(None, description="Whether to include archived spaces in the search. Default depends on Confluence setup.") # Not directly in atlassian-python-api cql method, but good to note
+
+    @model_validator(mode='after')
+    def check_cql_or_space_title_exclusive(cls, data: Any) -> Any:
+        # Ensure 'data' is the model's __dict__ when mode='after'
+        # For Pydantic V2, model_validator often passes the model instance itself, 
+        # so access fields via data.cql, data.space_key_for_cql etc.
+        # However, to be safe and align with common patterns or if data is dict:
+        
+        # If 'data' is the model instance (Pydantic V2 style for mode='after')
+        if not isinstance(data, dict):
+            cql_val = data.cql
+            space_key_val = data.space_key_for_cql
+            title_val = data.title_for_cql
+        else: # If 'data' is a dictionary (more common with mode='before' or older Pydantic)
+            cql_val = data.get('cql')
+            space_key_val = data.get('space_key_for_cql')
+            title_val = data.get('title_for_cql')
+
+        cql_provided = bool(cql_val)
+        space_key_provided = bool(space_key_val)
+        title_provided = bool(title_val)
+
+        if cql_provided:
+            if space_key_provided or title_provided:
+                raise ValueError("If 'cql' is provided, 'space_key_for_cql' and 'title_for_cql' must not be present.")
+        else: # cql is not provided
+            if not (space_key_provided and title_provided):
+                raise ValueError("If 'cql' is not provided, both 'space_key_for_cql' and 'title_for_cql' must be provided.")
+            if space_key_provided and not title_provided:
+                raise ValueError("If 'space_key_for_cql' is provided without 'cql', then 'title_for_cql' must also be provided.")
+            if title_provided and not space_key_provided:
+                raise ValueError("If 'title_for_cql' is provided without 'cql', then 'space_key_for_cql' must also be provided.")
+        return data
 
 class SearchedPageSchema(BaseModel):
     """
