@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 import asyncio
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 # Import the FastAPI app instance. Ensure PYTHONPATH or editable install is set up.
 # For now, assuming pytest is run from the root of Confluence-MCP-Server_Claude
@@ -122,9 +123,16 @@ def client(request) -> AsyncClient:
 
 @pytest.fixture
 def confluence_client_mock() -> MagicMock:
-    """Provides a MagicMock for the atlassian.Confluence client."""
+    """Provides a MagicMock for the atlassian.Confluence client,
+    and patches 'get_confluence_client' in main.py to return this mock."""
     mock = MagicMock()
-    # This URL is used by page_actions.py to construct the full web_url for pages.
+    # This URL is used by some logic if base_url isn't explicitly passed.
     # It should be the base instance URL, e.g., "https://your-domain.atlassian.net"
     mock.url = MOCK_CONFLUENCE_INSTANCE_URL 
-    return mock
+
+    # Patch the get_confluence_client function in the main module
+    # This ensures that when the app calls get_confluence_client(), it gets our mock.
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=mock) as patched_get_client:
+        yield mock # The test will use this mock directly
+
+    # The patch is automatically undone when the 'with' block exits.

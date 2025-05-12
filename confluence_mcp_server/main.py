@@ -17,11 +17,13 @@ from .mcp_actions.schemas import (
     GetPageInput, 
     GetPageOutput,
     SearchPagesInput,
-    SearchPagesOutput
+    SearchPagesOutput,
+    CreatePageInput,
+    CreatePageOutput
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
-from .mcp_actions.page_actions import get_page_logic, search_pages_logic
+from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -120,11 +122,20 @@ def load_tools():
     # Define and register the search_pages tool
     search_pages_tool_definition = MCPToolSchema(
         name="search_pages",
-        description="Searches for Confluence pages using CQL. Supports pagination, excerpts, and content expansion.",
+        description="Searches for Confluence pages using Confluence Query Language (CQL). Allows for pagination, expanding content, and highlighting excerpts.",
         input_schema=SearchPagesInput.model_json_schema(),
         output_schema=SearchPagesOutput.model_json_schema()
     )
     AVAILABLE_TOOLS[search_pages_tool_definition.name] = search_pages_tool_definition
+
+    # Define and register the create_page tool
+    create_page_tool_definition = MCPToolSchema(
+        name="create_page",
+        description="Creates a new page in a specified Confluence space. Allows setting title, content, and an optional parent page.",
+        input_schema=CreatePageInput.model_json_schema(),
+        output_schema=CreatePageOutput.model_json_schema()
+    )
+    AVAILABLE_TOOLS[create_page_tool_definition.name] = create_page_tool_definition
 
 # Call load_tools at startup to populate AVAILABLE_TOOLS
 load_tools()
@@ -247,6 +258,50 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
                     outputs=tool_output_model.model_dump(exclude_none=True) 
                 )
                 # print(f"DEBUG MAIN: Returning MCPExecuteResponse object for search_pages. Model: {response_object.model_dump_json(indent=2, exclude_none=True)}")
+                return response_object
+            except HTTPException as http_exc: 
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=str(http_exc.detail),
+                    error_type=type(http_exc).__name__ 
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
+            except Exception as e: 
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
+                    error_type="ToolLogicError"
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=500)
+
+        elif tool_name == "create_page":
+            try:
+                parsed_inputs = CreatePageInput(**request.inputs)
+            except ValidationError as e:
+                validation_errors = e.errors()
+                error_details_str = '; '.join([f"{err['loc'][-1] if err['loc'] else 'general'}: {err['msg']}" for err in validation_errors])
+                error_payload = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="error",
+                    error_message=f"Input validation failed for tool '{tool_name}'. Details: {error_details_str}",
+                    error_type="InputValidationError",
+                    validation_details=validation_errors
+                ).model_dump(exclude_none=True)
+                return JSONResponse(content=error_payload, status_code=422)
+            
+            try:
+                # Ensure CONFLUENCE_URL (base_url for link construction) is available
+                if not CONFLUENCE_URL:
+                    raise HTTPException(status_code=503, detail="CONFLUENCE_URL is not configured on the server, cannot construct page URL.")
+                
+                tool_output_model = create_page_logic(client=client, inputs=parsed_inputs, base_url=CONFLUENCE_URL)
+                response_object = MCPExecuteResponse(
+                    tool_name=tool_name,
+                    status="success",
+                    outputs=tool_output_model.model_dump(exclude_none=True) 
+                )
                 return response_object
             except HTTPException as http_exc: 
                 error_payload = MCPExecuteResponse(

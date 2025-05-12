@@ -33,6 +33,7 @@ class MCPExecuteResponse(BaseModel):
     outputs: Optional[Dict[str, Any]] = Field(None, description="A dictionary of output data from the tool, conforming to its output_schema. Present on success.")
     error_message: Optional[str] = Field(None, description="An error message if the execution failed. Present on error.")
     error_type: Optional[str] = Field(None, description="A more specific error type if applicable. Present on error.")
+    validation_details: Optional[List[Dict[str, Any]]] = Field(None, description="Detailed validation errors if input validation failed. Present on InputValidationError.")
 
 
 # --- Specific Tool Schemas (to be added as we implement tools) ---
@@ -228,3 +229,26 @@ class SearchPagesOutput(BaseModel):
     start_used: int = Field(..., description="The start parameter used for this query.")
     expand_used: Optional[str] = Field(None, description="The comma-separated string of 'expand' options used for this query.")
     excerpt_used: Optional[str] = Field(None, description="The 'excerpt' strategy used for this query.")
+
+
+# --- Schemas for 'create_page' tool ---
+
+class CreatePageInput(BaseModel):
+    """
+    Input schema for the create_page tool.
+    """
+    space_key: str = Field(..., description="The key of the Confluence space where the new page will be created.", examples=["DEV"])
+    title: str = Field(..., description="The title for the new page.", examples=["My New Awesome Page"])
+    content: str = Field(..., description="The content of the page, in Confluence Storage Format.", examples=["<p>This is the initial content of my new page.</p>"])
+    parent_page_id: Optional[int] = Field(None, description="The ID of an existing page under which the new page will be created as a child. If omitted, the page is created at the top level of the space.", examples=[12345])
+
+class CreatePageOutput(BaseModel):
+    """
+    Output schema for the create_page tool, returned upon successful page creation.
+    """
+    page_id: int = Field(..., description="The unique ID of the newly created Confluence page.")
+    title: str = Field(..., description="The title of the newly created page.")
+    space_key: str = Field(..., description="The key of the space where the page was created.")
+    version: int = Field(..., description="The initial version number of the newly created page (typically 1).")
+    status: str = Field(..., description="The status of the newly created page (e.g., 'current').")
+    url: str = Field(..., description="The full web URL to access the newly created page.")

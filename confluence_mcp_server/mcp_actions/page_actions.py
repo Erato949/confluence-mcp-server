@@ -1,7 +1,7 @@
 # confluence_mcp_server/mcp_actions/page_actions.py
 
 from atlassian import Confluence
-from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput
+from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput, CreatePageInput, CreatePageOutput
 from fastapi import HTTPException
 from typing import List, Dict, Any, Optional
 
@@ -262,3 +262,91 @@ def search_pages_logic(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"{error_type}: {error_msg}")
+
+def create_page_logic(
+    client: Confluence,
+    inputs: CreatePageInput,
+    base_url: str  # Base URL of the Confluence instance
+) -> CreatePageOutput:
+    """
+    Logic for the create_page tool.
+    Creates a new page in Confluence.
+    """
+    try:
+        print(f"DEBUG: create_page_logic called with inputs: space_key='{inputs.space_key}', title='{inputs.title}', parent_page_id={inputs.parent_page_id}, content_length={len(inputs.content)}")
+
+        # The atlassian-python-api's create_page expects parent_id as a string if provided.
+        parent_id_str = str(inputs.parent_page_id) if inputs.parent_page_id is not None else None
+
+        created_page_data = client.create_page(
+            space=inputs.space_key,
+            title=inputs.title,
+            body=inputs.content,
+            parent_id=parent_id_str,
+            type='page',
+            representation='storage',
+            editor='v2' # Optional: specify editor version, v2 is common for storage format
+        )
+
+        if not created_page_data or 'id' not in created_page_data:
+            print(f"DEBUG: create_page API call did not return expected data or ID. Response: {created_page_data}")
+            raise HTTPException(status_code=500, detail="Confluence API did not return expected data after page creation.")
+
+        print(f"DEBUG: Page created successfully. API response: {created_page_data}")
+
+        page_id = int(created_page_data['id'])
+        title = created_page_data.get('title', inputs.title) # API should return title
+        version_info = created_page_data.get('version', {})
+        version_number = version_info.get('number', 1) # Default to 1 if not present
+        status = created_page_data.get('status', 'current')
+
+        # Construct the web URL
+        # Example _links structure: {'webui': '/display/SPACEKEY/Page+Title', ...}
+        # or sometimes {'tinyui': '/x/shortlink', 'self': '...rest/api/content/id'}
+        web_ui_link_path = ""
+        if '_links' in created_page_data and 'webui' in created_page_data['_links']:
+            web_ui_link_path = created_page_data['_links']['webui']
+        
+        # Ensure base_url doesn't have a trailing slash if web_ui_link_path starts with one
+        if base_url.endswith('/') and web_ui_link_path.startswith('/'):
+            effective_base_url = base_url.rstrip('/')
+        else:
+            effective_base_url = base_url
+            
+        full_web_url = f"{effective_base_url}{web_ui_link_path}" if web_ui_link_path else f"{effective_base_url}/pages/viewpage.action?pageId={page_id}"
+
+
+        return CreatePageOutput(
+            page_id=page_id,
+            title=title,
+            space_key=inputs.space_key, # The space key is from input, not typically in create_page response directly
+            version=version_number,
+            status=status,
+            url=full_web_url
+        )
+
+    except HTTPException: # Re-raise HTTPException
+        raise
+    except Exception as e:
+        error_type = type(e).__name__
+        error_msg = f"Error during page creation: {str(e)}"
+        print(f"An unexpected error occurred in create_page_logic: {error_type} - {error_msg}")
+        import traceback
+        traceback.print_exc() # For server-side logging of the full error
+        # Provide a more user-friendly message if possible, or specific Confluence error details
+        # For example, check if 'e' has attributes like 'response' for REST API errors
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                confluence_error = e.response.json()
+                error_detail = confluence_error.get('message', str(e))
+                status_code = e.response.status_code
+                # Check for common Confluence errors
+                if "A page with this title already exists" in error_detail:
+                    status_code = 409 # Conflict
+                
+                print(f"Confluence API Error ({status_code}): {error_detail}")
+                raise HTTPException(status_code=status_code, detail=f"Confluence API Error: {error_detail}")
+            except ValueError: # If response is not JSON
+                pass # Fall through to generic error
+
+        raise HTTPException(status_code=500, detail=f"Server Error ({error_type}): {error_msg}")
