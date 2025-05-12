@@ -1,8 +1,9 @@
 # confluence_mcp_server/mcp_actions/page_actions.py
 
 from atlassian import Confluence
-from .schemas import GetPageInput, GetPageOutput
+from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput
 from fastapi import HTTPException
+from typing import List, Dict, Any, Optional
 
 def get_page_logic(
     client: Confluence,
@@ -115,3 +116,149 @@ def get_page_logic(
 
         # Convert other exceptions to a generic 500 error for the tool execution
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching page using {lookup_method_desc}: {str(e)}")
+
+
+def search_pages_logic(
+    client: Confluence,
+    inputs: SearchPagesInput
+) -> SearchPagesOutput:
+    """
+    Logic for the search_pages tool.
+    Searches Confluence pages using CQL.
+    """
+    try:
+        print(f"DEBUG: search_pages_logic called with CQL: {inputs.cql}, limit: {inputs.limit}, start: {inputs.start}, expand: {inputs.expand}, excerpt: {inputs.excerpt}")
+
+        # The atlassian-python-api's cql method returns a dictionary that usually includes:
+        # 'results': list of page objects
+        # 'start': the start point of the result set
+        # 'limit': the page size
+        # 'size': the number of results in the current page
+        # 'totalSize': (optional, sometimes not present or accurate) total number of results available
+        # '_links': contains links for pagination (e.g., 'next', 'prev')
+        
+        api_response = client.cql(
+            cql=inputs.cql,
+            limit=inputs.limit,
+            start=inputs.start,
+            expand=inputs.expand,
+            excerpt=inputs.excerpt
+            # include_archived_spaces is not a direct param for client.cql; it's part of CQL itself if needed.
+        )
+
+        if not api_response or 'results' not in api_response:
+            print(f"DEBUG: CQL search for '{inputs.cql}' returned no results or unexpected response format.")
+            return SearchPagesOutput(
+                results=[],
+                count=0,
+                total_available=0,
+                cql_query_used=inputs.cql,
+                limit_used=inputs.limit,
+                start_used=inputs.start,
+                expand_used=inputs.expand,
+                excerpt_used=inputs.excerpt
+            )
+
+        print(f"DEBUG: api_response from Confluence: {api_response}")
+
+        processed_results: List[SearchedPageSchema] = []
+        base_url = client.url.split('/rest/api')[0]
+        if not base_url.endswith('/wiki'):
+            if not base_url.endswith('/'):
+                base_url += '/'
+            base_url += 'wiki'
+
+        for page_data in api_response.get('results', []):
+            space_key_val = None
+            if 'space' in page_data and isinstance(page_data['space'], dict) and 'key' in page_data['space']:
+                space_key_val = page_data['space']['key']
+            elif 'content' in page_data and isinstance(page_data['content'], dict) and \
+                 'space' in page_data['content'] and isinstance(page_data['content']['space'], dict) and \
+                 'key' in page_data['content']['space']:
+                 space_key_val = page_data['content']['space']['key']
+
+            content_val = None
+            if 'body' in page_data and isinstance(page_data['body'], dict):
+                if 'storage' in page_data['body'] and isinstance(page_data['body']['storage'], dict) and 'value' in page_data['body']['storage']:
+                    content_val = page_data['body']['storage']['value']
+                elif 'view' in page_data['body'] and isinstance(page_data['body']['view'], dict) and 'value' in page_data['body']['view']:
+                    content_val = page_data['body']['view']['value']
+
+            version_val = None
+            if 'version' in page_data and isinstance(page_data['version'], dict) and 'number' in page_data['version']:
+                version_val = page_data['version']['number']
+
+            web_ui_link_path = ""
+            if '_links' in page_data and 'webui' in page_data['_links']:
+                web_ui_link_path = page_data['_links']['webui']
+            elif 'content' in page_data and '_links' in page_data['content'] and 'webui' in page_data['content']['_links']:
+                web_ui_link_path = page_data['content']['_links']['webui']
+            
+            web_url_val = f"{base_url}{web_ui_link_path}" if web_ui_link_path else "URL_NOT_FOUND"
+
+            excerpt_highlight_val = None
+            if inputs.excerpt == 'highlight': # Check if highlight was requested
+                # The API might return it as 'excerpt' (common) or 'highlight' (less common but possible)
+                # We prioritize 'excerpt' if present, then 'highlight'.
+                if 'excerpt' in page_data:
+                    excerpt_highlight_val = page_data.get('excerpt')
+                elif 'highlight' in page_data:
+                    excerpt_highlight_val = page_data.get('highlight')
+
+            # Page ID and Title can be in 'content' or directly on the result object
+            page_id_val = None
+            title_val = "Untitled"
+            status_val = "unknown"
+            last_modified_val = None # Initialize
+
+            content_obj = page_data.get('content', page_data) # Fallback to page_data if 'content' isn't there
+            if isinstance(content_obj, dict):
+                page_id_val = int(content_obj.get('id', 0))
+                title_val = content_obj.get('title', 'Untitled')
+                status_val = content_obj.get('status', 'unknown')
+                # history.lastUpdated.when or similar for last_modified_date. Requires 'history.lastUpdated' in expand.
+                if 'history' in content_obj and isinstance(content_obj['history'], dict) and \
+                   'lastUpdated' in content_obj['history'] and isinstance(content_obj['history']['lastUpdated'], dict) and \
+                   'when' in content_obj['history']['lastUpdated']:
+                    last_modified_val = content_obj['history']['lastUpdated']['when']
+            
+            if page_id_val is None:
+                # If still no page ID, skip this result as it's unusable for SearchedPageSchema
+                print(f"DEBUG: Skipping result due to missing page ID. Raw data: {page_data}")
+                continue
+
+            processed_results.append(
+                SearchedPageSchema(
+                    page_id=page_id_val,
+                    title=title_val,
+                    space_key=space_key_val,
+                    status=status_val,
+                    excerpt_highlight=excerpt_highlight_val,
+                    content=content_val,
+                    version=version_val,
+                    web_url=web_url_val,
+                    last_modified_date=last_modified_val
+                    # raw_result=page_data # If we decide to include raw results
+                )
+            )
+
+        return SearchPagesOutput(
+            results=processed_results,
+            count=len(processed_results), # This is the number of items we successfully processed
+            total_available=api_response.get('totalSize'), # Use totalSize from API if available
+            cql_query_used=inputs.cql,
+            limit_used=inputs.limit,
+            start_used=inputs.start,
+            expand_used=inputs.expand,
+            excerpt_used=inputs.excerpt
+        )
+
+    except HTTPException: # Re-raise HTTPException
+        raise
+    except Exception as e:
+        error_type = type(e).__name__
+        error_msg = f"Error during CQL search: {str(e)}"
+        print(f"An unexpected error occurred in search_pages_logic: {error_type} - {error_msg}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"{error_type}: {error_msg}")
