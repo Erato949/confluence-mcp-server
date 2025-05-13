@@ -4,7 +4,10 @@ from atlassian import Confluence
 from atlassian.errors import ApiError
 from fastapi import HTTPException
 
-from .schemas import GetCommentsInput, CommentOutputItem, GetCommentsOutput
+from .schemas import (
+    GetCommentsInput, CommentOutputItem, GetCommentsOutput, 
+    AddCommentInput, AddCommentOutput
+)
 
 async def get_comments_logic(
     client: Confluence, 
@@ -117,3 +120,71 @@ async def get_comments_logic(
     except Exception as e:
         # Catch-all for other unexpected errors, e.g., issues with response parsing
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while processing comments: {str(e)}")
+
+
+async def add_comment_logic(
+    client: Confluence,
+    inputs: AddCommentInput
+) -> AddCommentOutput:
+    """
+    Logic to add a comment to a Confluence page.
+    """
+    try:
+        # Use the add_comment method from the atlassian-python-api library
+        # Requires page_id, body (in Storage Format), and optionally parent_id for replies
+        api_response = client.add_comment(
+            page_id=inputs.page_id,
+            body=inputs.body,
+            parent_id=inputs.parent_comment_id # Pass None if not provided; the library handles it
+        )
+
+        # Expecting a dictionary representing the created comment on success
+        # e.g., {'id': '67890', 'type': 'comment', ...}
+        
+        new_comment_id = api_response.get('id')
+        if not new_comment_id:
+             # Should not happen on success from a well-behaved API, but check defensively
+             raise ValueError("Confluence API succeeded but did not return a comment ID.")
+             
+        new_comment_id_str = str(new_comment_id) # Ensure ID is a string for our schema
+
+        # Return the structure defined in AddCommentOutput
+        return AddCommentOutput(
+            comment_id=new_comment_id_str,
+            page_id=inputs.page_id # Echo back the page ID for context
+            # url=api_response.get('_links', {}).get('webui') # Constructing URL might be complex, omit for now
+        )
+
+    except ApiError as e:
+        # Handle specific API errors based on status code
+        api_status_code = getattr(e, 'status_code', 500)
+        error_reason = getattr(e, 'reason', 'Unknown Reason')
+        error_url = getattr(e, 'url', 'N/A') # Useful for debugging
+
+        if api_status_code == 404:
+            # This typically means the Page ID was not found, or potentially the Parent Comment ID if provided.
+            # The API error message might not distinguish clearly.
+            detail_message = f"Could not add comment: Page ID '{inputs.page_id}' not found, or Parent Comment ID '{inputs.parent_comment_id}' not found, or user lacks permission to view/comment."
+            raise HTTPException(status_code=404, detail=detail_message)
+        elif api_status_code == 400:
+             # Bad Request - often due to invalid input format (e.g., malformed body storage format)
+             detail_message = f"Error adding comment: Invalid input provided. Details: Received {api_status_code} {error_reason} for url: {error_url}. Check body format."
+             raise HTTPException(status_code=400, detail=detail_message)
+        elif api_status_code == 403:
+             # Forbidden - User likely lacks permission to add comments to this page/space
+             detail_message = f"Error adding comment: User does not have permission to comment on page ID '{inputs.page_id}'. Details: Received {api_status_code} {error_reason} for url: {error_url}."
+             raise HTTPException(status_code=403, detail=detail_message)
+        else:
+            # Handle other potential API errors (e.g., 401 Unauthorized, 5xx Server Errors)
+            detail_message = f"Error adding comment to Confluence: Details: Received {api_status_code} {error_reason} for url: {error_url}."
+            # Use the API status code if it's a standard client/server error, otherwise default to 500
+            http_status = api_status_code if 400 <= api_status_code < 600 else 500
+            raise HTTPException(status_code=http_status, detail=detail_message)
+
+    except ValueError as ve:
+         # Catch specific internal errors like the missing ID check
+         raise HTTPException(status_code=500, detail=f"Internal processing error after adding comment: {str(ve)}")
+
+    except Exception as e:
+        # Catch-all for any other unexpected exceptions during the process
+        raise HTTPException(status_code=500, detail=f"An unexpected server error occurred while adding the comment: {str(e)}")

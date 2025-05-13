@@ -32,12 +32,14 @@ from .mcp_actions.schemas import (
     GetCommentsInput, # Added for get_comments tool
     GetCommentsOutput, # Added for get_comments tool
     DeletePageInput, # Added for delete_page tool
-    DeletePageOutput # Added for delete_page tool
+    DeletePageOutput, # Added for delete_page tool
+    AddCommentInput,  # Added for add_comment tool
+    AddCommentOutput # Added for add_comment tool
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
 from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic, update_page_logic, delete_page_logic # Added delete_page_logic
-from .mcp_actions.comment_actions import get_comments_logic # Added for get_comments tool
+from .mcp_actions.comment_actions import get_comments_logic, add_comment_logic # Added add_comment_logic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -200,6 +202,14 @@ def load_tools():
         "input_schema": GetCommentsInput,
         "output_schema": GetCommentsOutput,
         "logic": get_comments_logic
+    }
+
+    # Add Comment Tool Definition
+    AVAILABLE_TOOLS['Add_Comment'] = {
+        "description": "Adds a new comment to a Confluence page, optionally as a reply to an existing comment.",
+        "input_schema": AddCommentInput,
+        "output_schema": AddCommentOutput,
+        "logic": add_comment_logic
     }
 
     # Delete Page Tool Definition

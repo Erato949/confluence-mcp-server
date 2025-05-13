@@ -114,15 +114,15 @@
         *   [x] Error handling: page not found.
         *   [x] Error handling: invalid input types.
 *   **`add_comment` Action:**
-    *   [ ] Define `add_comment` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `add_comment_logic` function in `mcp_actions/comment_actions.py`
-    *   [ ] Integrate `add_comment` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `add_comment` tool, covering:
-        *   [ ] Successful execution: adding a top-level comment to a page.
-        *   [ ] Successful execution: replying to an existing comment (`parent_comment_id`).
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: parent comment not found.
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `add_comment` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `add_comment_logic` function in `mcp_actions/comment_actions.py`
+    *   [x] Integrate `add_comment` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `add_comment` tool, covering:
+        *   [x] Successful execution: adding a top-level comment to a page.
+        *   [x] Successful execution: replying to an existing comment (`parent_comment_id`).
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: parent comment not found.
+        *   [x] Error handling: invalid input types.
 *   **`get_attachments` Action:**
     *   [ ] Define `get_attachments` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `get_attachments_logic` function in `mcp_actions/attachment_actions.py`

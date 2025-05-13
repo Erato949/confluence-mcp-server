@@ -6,7 +6,7 @@ from atlassian import Confluence
 from atlassian.errors import ApiError
 
 from confluence_mcp_server.main import app 
-from confluence_mcp_server.mcp_actions.schemas import GetCommentsInput, GetCommentsOutput, MCPExecuteResponse
+from confluence_mcp_server.mcp_actions.schemas import GetCommentsInput, GetCommentsOutput, MCPExecuteResponse, AddCommentInput, AddCommentOutput
 
 BASE_URL = "" # Changed from "/api/v1/mcp"
 
@@ -249,3 +249,290 @@ async def test_get_comments_other_api_error(
 # - test_get_comments_input_validation_page_id_missing (FastAPI/Pydantic validation)
 # - test_get_comments_input_validation_limit_invalid (e.g., string, negative, zero)
 # - test_get_comments_input_validation_start_invalid (e.g., negative)
+
+
+# --- Tests for add_comment ---
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_success(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test successfully adding a top-level comment."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    mock_api_response = {"id": "67890"}
+    mock_returned_confluence_client.add_comment.return_value = mock_api_response
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="12345", body="<p>Test top-level comment</p>")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 200
+    response_data = response.json()
+    
+    assert response_data["status"] == "success"
+    assert response_data["tool_name"] == "Add_Comment"
+    outputs = response_data.get("outputs")
+    assert outputs is not None
+    assert outputs["comment_id"] == "67890"
+    assert outputs["page_id"] == "12345"
+
+    mock_returned_confluence_client.add_comment.assert_called_once_with(
+        page_id="12345",
+        body="<p>Test top-level comment</p>",
+        parent_id=None # Check parent_id is None for top-level
+    )
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_reply_success(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test successfully adding a reply to a comment."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    mock_api_response = {"id": "67891"} # Different ID for reply
+    mock_returned_confluence_client.add_comment.return_value = mock_api_response
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(
+        page_id="12345", 
+        body="<p>Test reply comment</p>", 
+        parent_comment_id="67890" # Provide parent ID
+    )
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 200
+    response_data = response.json()
+    
+    assert response_data["status"] == "success"
+    outputs = response_data.get("outputs")
+    assert outputs is not None
+    assert outputs["comment_id"] == "67891"
+    assert outputs["page_id"] == "12345"
+
+    mock_returned_confluence_client.add_comment.assert_called_once_with(
+        page_id="12345",
+        body="<p>Test reply comment</p>",
+        parent_id="67890" # Check parent_id is passed correctly
+    )
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_page_not_found(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test adding comment when the page ID is not found (404)."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    error_instance = ApiError(reason="Page Not Found")
+    error_instance.status_code = 404
+    error_instance.url = "mock_url"
+    mock_returned_confluence_client.add_comment.side_effect = error_instance
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="invalid-page", body="<p>Test comment</p>")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 404
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    expected_detail = f"Could not add comment: Page ID 'invalid-page' not found, or Parent Comment ID 'None' not found, or user lacks permission to view/comment."
+    assert response_data["error_message"] == expected_detail
+
+    mock_returned_confluence_client.add_comment.assert_called_once_with(
+        page_id="invalid-page", body="<p>Test comment</p>", parent_id=None
+    )
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_parent_not_found(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test adding comment when the parent comment ID is not found (also 404)."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    error_instance = ApiError(reason="Parent Not Found") # Reason might vary
+    error_instance.status_code = 404
+    error_instance.url = "mock_url"
+    mock_returned_confluence_client.add_comment.side_effect = error_instance
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="12345", body="<p>Test reply</p>", parent_comment_id="invalid-parent")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 404
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    # Note: The error message might be identical to page_not_found based on current logic
+    expected_detail = f"Could not add comment: Page ID '12345' not found, or Parent Comment ID 'invalid-parent' not found, or user lacks permission to view/comment."
+    assert response_data["error_message"] == expected_detail
+
+    mock_returned_confluence_client.add_comment.assert_called_once_with(
+        page_id="12345", body="<p>Test reply</p>", parent_id="invalid-parent"
+    )
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_forbidden(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test adding comment when user lacks permissions (403)."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    error_instance = ApiError(reason="Forbidden")
+    error_instance.status_code = 403
+    error_instance.url = "mock_url"
+    mock_returned_confluence_client.add_comment.side_effect = error_instance
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="restricted-page", body="<p>Test comment</p>")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 403
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    expected_detail = f"Error adding comment: User does not have permission to comment on page ID 'restricted-page'. Details: Received 403 Forbidden for url: mock_url."
+    assert response_data["error_message"] == expected_detail
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_bad_request(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test adding comment with invalid input format (400)."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    error_instance = ApiError(reason="Bad Request - Invalid Body")
+    error_instance.status_code = 400
+    error_instance.url = "mock_url"
+    mock_returned_confluence_client.add_comment.side_effect = error_instance
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="12345", body="Invalid body format") # Not valid storage format
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 400
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    expected_detail = f"Error adding comment: Invalid input provided. Details: Received 400 Bad Request - Invalid Body for url: mock_url. Check body format."
+    assert response_data["error_message"] == expected_detail
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_api_returns_no_id(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test handling when API succeeds (2xx) but response lacks 'id'."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    # Simulate a successful API call returning an unexpected structure
+    mock_api_response = {"type": "comment", "status": "created"} 
+    mock_returned_confluence_client.add_comment.return_value = mock_api_response
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="12345", body="<p>Test comment</p>")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 500 # Should raise HTTPException(500) due to ValueError
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    # Check for the detail message coming from the ValueError raised in the logic
+    assert "Internal processing error after adding comment: Confluence API succeeded but did not return a comment ID." in response_data["error_message"]
+
+@pytest.mark.anyio
+@patch("confluence_mcp_server.main.get_confluence_client")
+async def test_add_comment_unexpected_error(
+    mock_get_confluence_client, 
+    client: AsyncClient
+):
+    """Test handling of unexpected exceptions during logic execution."""
+    mock_returned_confluence_client = MagicMock(spec=Confluence)
+    mock_returned_confluence_client.add_comment.side_effect = Exception("Something went wrong unexpectedly")
+    mock_get_confluence_client.return_value = mock_returned_confluence_client
+
+    tool_inputs = AddCommentInput(page_id="12345", body="<p>Test comment</p>")
+    request_payload = {
+        "tool_name": "Add_Comment", 
+        "inputs": tool_inputs.model_dump(exclude_none=True)
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 500
+    response_data = response.json()
+    
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    assert "An unexpected server error occurred while adding the comment: Something went wrong unexpectedly" in response_data["error_message"]
+
+@pytest.mark.anyio
+async def test_add_comment_input_validation_missing_required(client: AsyncClient):
+    """Test input validation failure (missing required fields -> 422)."""
+    # Missing 'body' which is required
+    invalid_inputs = {"page_id": "12345"} 
+    request_payload = {
+        "tool_name": "Add_Comment",
+        "inputs": invalid_inputs
+    }
+
+    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+
+    assert response.status_code == 422 # FastAPI validation error
+    response_data = response.json()
+
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "InputValidationError"
+    assert response_data["error_message"] == "Input validation failed."
+    assert "validation_details" in response_data
+    assert isinstance(response_data["validation_details"], list)
+    # Check that the error detail mentions the missing 'body' field
+    assert any(detail.get("loc") == ["body"] and "Field required" in detail.get("msg", "") for detail in response_data["validation_details"])
+
+# TODO: Add more validation tests if needed (e.g., invalid types, constraints)

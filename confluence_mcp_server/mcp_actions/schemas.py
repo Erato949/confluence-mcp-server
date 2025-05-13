@@ -341,4 +341,23 @@ class GetCommentsOutput(BaseModel):
     start_used: int = Field(..., description="The start parameter value used for this request.")
 
 
+# --- Add Comment Schemas ---
+
+class AddCommentInput(BaseModel):
+    """
+    Input schema for the add_comment tool.
+    """
+    page_id: str = Field(..., description="The ID of the Confluence page to add the comment to.", examples=["12345"])
+    body: str = Field(..., description="The content of the comment in Confluence Storage Format.", examples=["<p>This is a new comment.</p>"])
+    parent_comment_id: Optional[str] = Field(None, description="If replying to an existing comment, provide its ID.", examples=["54321"])
+
+class AddCommentOutput(BaseModel):
+    """
+    Output schema for the add_comment tool, returned upon successful comment creation.
+    """
+    comment_id: str = Field(..., description="The ID of the newly created comment.")
+    page_id: str = Field(..., description="The ID of the page the comment was added to.")
+    # url: Optional[str] = Field(None, description="Direct URL to the new comment, if available from the API response.") # URL might be complex to construct/retrieve reliably
+
+
 # Tool Registry (Example structure, adapt as needed)
