@@ -62,11 +62,8 @@
     *   [x] Define `search_pages` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `search_pages_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `search_pages` into `main.py`'s `execute_tool`
-    *   [x] Implement automated tests for `search_pages` tool, covering:
-        *   [x] Successful execution with a simple CQL query.
-        *   [x] Successful execution with `limit` and `start` parameters.
-        *   [x] Successful execution with different `excerpt` strategies (e.g., 'highlight').
-        *   [x] Successful execution with `expand` options (e.g., 'body.storage', 'version'). Refactored to use comma-separated string.
+    *   [x] Create `tests/test_search_pages_tool.py` and implement automated tests for `search_pages` tool, covering:
+        *   [x] Successful execution with various valid inputs.
         *   [x] Behavior: query returns multiple results.
         *   [x] Behavior: query returns no results.
         *   [x] Error handling: invalid CQL query syntax.
@@ -75,11 +72,10 @@
     *   [x] Define `update_page` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `update_page_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `update_page` into `main.py`'s `execute_tool`
-    *   [x] Implement automated tests for `update_page` tool, covering:
-        *   [x] Successful execution: updating page title.
-        *   [x] Successful execution: updating page body content.
-        *   [x] Successful execution: updating page parent.
-        *   [x] Successful execution: providing `current_version_number` for conflict resolution.
+    *   [x] Create `tests/test_update_page_tool.py` and implement automated tests for `update_page` tool, covering:
+        *   [x] Successful execution: updating title.
+        *   [x] Successful execution: updating content.
+        *   [x] Successful execution: updating parent page.
         *   [x] Error handling: page not found.
         *   [x] Error handling: version conflict (if `current_version_number` is stale).
         *   [x] Error handling: invalid input types.
@@ -87,10 +83,9 @@
     *   [x] Define `create_page` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `create_page_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `create_page` into `main.py`'s `execute_tool`
-    *   [x] Implement automated tests for `create_page` tool, covering:
-        *   [x] Successful execution: creating a new page with title, space_key, and body.
-        *   [x] Successful execution: creating a page under a parent page (`parent_page_id`).
-        *   [x] Error handling: space not found (invalid `space_key`).
+    *   [x] Create `tests/test_create_page_tool.py` and implement automated tests for `create_page` tool, covering:
+        *   [x] Successful execution: creating a new page under a parent page.
+        *   [x] Successful execution: creating a new top-level page in a space.
         *   [x] Error handling: parent page not found (invalid `parent_page_id`).
         *   [x] Error handling: page with the same title already exists in the space (if not allowed).
         *   [x] Error handling: invalid input types.
@@ -98,11 +93,10 @@
     *   [x] Define `delete_page` input/output schema in `mcp_actions/schemas.py` (Input: `page_id`, Output: `message` or success bool)
     *   [x] Implement `delete_page_logic` function in `mcp_actions/page_actions.py`
     *   [x] Integrate `delete_page` into `main.py`'s `execute_tool`
-    *   [x] Implement automated tests for `delete_page` tool, covering:
+    *   [x] Create `tests/test_delete_page_tool.py` and implement automated tests for `delete_page` tool, covering:
         *   [x] Successful execution: deleting an existing page.
         *   [x] Error handling: page not found.
-        *   [x] Error handling: insufficient permissions (if possible to simulate).
-        *   [x] Error handling: invalid input types (e.g., non-string page_id).
+        *   [x] Error handling: invalid input types.
 *   **`get_comments` Action:**
     *   [x] Define `get_comments` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `get_comments_logic` function in `mcp_actions/comment_actions.py`
@@ -118,35 +112,40 @@
     *   [x] Implement `add_comment_logic` function in `mcp_actions/comment_actions.py`
     *   [x] Integrate `add_comment` into `main.py`'s `execute_tool`
     *   [x] Implement automated tests for `add_comment` tool, covering:
-        *   [x] Successful execution: adding a top-level comment to a page.
+        *   [x] Successful execution: adding a new top-level comment.
         *   [x] Successful execution: replying to an existing comment (`parent_comment_id`).
         *   [x] Error handling: page not found.
         *   [x] Error handling: parent comment not found.
         *   [x] Error handling: invalid input types.
 *   **`get_attachments` Action:**
-    *   [ ] Define `get_attachments` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `get_attachments_logic` function in `mcp_actions/attachment_actions.py`
-    *   [ ] Integrate `get_attachments` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `get_attachments` tool, covering:
-        *   [ ] Successful execution: fetching attachments for a page with attachments.
-        *   [ ] Successful execution: filtering by `filename`.
-        *   [ ] Successful execution: filtering by `media_type`.
-        *   [ ] Successful execution: with `limit` and `start` parameters.
-        *   [ ] Behavior: page has no attachments.
-        *   [ ] Behavior: page has no attachments matching filters.
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `get_attachments` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `get_attachments_logic` function in `mcp_actions/attachment_actions.py`
+    *   [x] Integrate `get_attachments` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `get_attachments` tool, covering:
+        *   [x] Successful execution: fetching attachments for a page with attachments.
+        *   [x] Successful execution: filtering by `filename`.
+        *   [x] Successful execution: filtering by `media_type`.
+        *   [x] Successful execution: with `limit` and `start` parameters.
+        *   [x] Behavior: page has no attachments.
+        *   [x] Behavior: page has no attachments matching filters.
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: invalid input types.
+        *   [x] Error handling: other Confluence API errors (e.g., 500, 403).
+        *   [x] Pagination edge case: `limit=0`.
+        *   [x] Pagination edge case: `start` index exceeding available items.
+        *   [x] Successful execution: filtering by both `filename` and `media_type` (conditional on API support).
+    *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pyproject.toml` as it's internal to Starlette).
 *   **`add_attachment` Action:**
-    *   [ ] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
-    *   [ ] Integrate `add_attachment` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `add_attachment` tool, covering:
-        *   [ ] Successful execution: adding a new attachment to a page.
-        *   [ ] Successful execution: adding an attachment with a comment.
-        *   [ ] Successful execution: updating an existing attachment (new version).
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: file data issues (e.g., empty, too large if there are limits).
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
+    *   [x] Integrate `add_attachment` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `add_attachment` tool, covering:
+        *   [x] Successful execution: adding a new attachment to a page.
+        *   [x] Successful execution: adding an attachment with a comment.
+        *   [x] Successful execution: updating an existing attachment (new version).
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: file data issues (e.g., empty, too large if there are limits).
+        *   [x] Error handling: invalid input types.
 
 ## Phase 4: Testing, Refinement & Documentation
 *   [x] Set up GitHub repository and push initial project state.
@@ -176,3 +175,4 @@
 *   [x] Resolved all test failures (89/89 passing) by correcting AnyIO backend configuration for asyncio and fixing URL assertion logic in create_page tests.
 *   [ ] Ensure all future tools are developed with corresponding automated tests.
 *   [ ] Integrate test execution into the development workflow (e.g., a simple script or command to run all tests).
+

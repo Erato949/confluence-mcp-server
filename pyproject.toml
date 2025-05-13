@@ -1,1 +1,4 @@
 [tool.pytest.ini_options]
+    filterwarnings = [
+        "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning:starlette\\.formparsers"
+    ]
