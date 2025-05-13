@@ -70,7 +70,7 @@ async def test_create_page_success_top_level(mock_get_client, client: AsyncClien
         inputs=inputs # Pass the raw dict, not the Pydantic object
     )
 
-    response = await client.post("/execute", json=execute_payload.model_dump())
+    response = await client.post("/tools/execute", json=execute_payload.model_dump())
 
     print(f"Test Response Status: {response.status_code}")
     print(f"Test Response JSON: {response.json()}")
@@ -154,7 +154,7 @@ async def test_create_page_success_child_page(mock_get_client, client: AsyncClie
         inputs=inputs # Pass the raw dict, not the Pydantic object
     )
 
-    response = await client.post("/execute", json=execute_payload.model_dump())
+    response = await client.post("/tools/execute", json=execute_payload.model_dump())
 
     assert response.status_code == 200
     response_data = response.json()
@@ -218,7 +218,7 @@ async def test_create_page_invalid_inputs(mock_get_client, client: AsyncClient, 
         "inputs": final_inputs # Use the specifically crafted invalid input
     }
 
-    response = await client.post("/execute", json=execute_payload)
+    response = await client.post("/tools/execute", json=execute_payload)
 
     print(f"Test Invalid Input: {final_inputs}")
     print(f"Test Response Status: {response.status_code}")
@@ -274,7 +274,7 @@ async def test_create_page_api_error(mock_get_client, client: AsyncClient, confl
         "inputs": inputs
     }
 
-    response = await client.post("/execute", json=execute_payload)
+    response = await client.post("/tools/execute", json=execute_payload)
 
     # Assert the response based on the HTTPException raised by the *logic*
     assert response.status_code == 500 # Status code from logic's general Exception handler
@@ -320,7 +320,7 @@ async def test_create_page_api_error_space_not_found(mock_get_client, client: As
         "inputs": inputs
     }
 
-    response = await client.post("/execute", json=execute_payload)
+    response = await client.post("/tools/execute", json=execute_payload)
 
     assert response.status_code == 404 # Expected status code from ApiError handling in logic
     response_data = response.json()
@@ -364,7 +364,7 @@ async def test_create_page_api_error_parent_not_found(mock_get_client, client: A
         "inputs": inputs
     }
 
-    response = await client.post("/execute", json=execute_payload)
+    response = await client.post("/tools/execute", json=execute_payload)
 
     assert response.status_code == 400 # Expected status code from ApiError handling in logic
     response_data = response.json()
@@ -409,7 +409,7 @@ async def test_create_page_api_error_duplicate_title(mock_get_client, client: As
         "inputs": inputs
     }
 
-    response = await client.post("/execute", json=execute_payload)
+    response = await client.post("/tools/execute", json=execute_payload)
 
     assert response.status_code == 400 # Expected status code from ApiError handling in logic
     response_data = response.json()

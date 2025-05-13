@@ -81,7 +81,7 @@ async def test_update_page_success_title_only(mock_get_client, client: AsyncClie
         url=expected_url
     )
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}. Response: {response.text}" # Add detail
     response_data = response.json()
@@ -154,7 +154,7 @@ async def test_update_page_success_content_only(mock_get_client, client: AsyncCl
         url=expected_url
     )
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -217,7 +217,7 @@ async def test_update_page_success_title_and_content(mock_get_client, client: As
         url=expected_url
     )
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -291,7 +291,7 @@ async def test_update_page_success_parent_page_id_only(mock_get_client, client: 
         url=expected_url
     )
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -333,7 +333,7 @@ async def test_update_page_missing_page_id(mock_get_client, client: AsyncClient,
          if "inputs" in payload_dict and "page_id" in payload_dict["inputs"]:
              del payload_dict["inputs"]["page_id"] # Actually remove if present from default
 
-    response = await client.post("/execute", json=payload_dict) # Send potentially modified dict
+    response = await client.post("/tools/execute", json=payload_dict) # Send potentially modified dict
 
     assert response.status_code == 422, f"Expected 422, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -359,7 +359,7 @@ async def test_update_page_missing_version(mock_get_client, client: AsyncClient,
          if "inputs" in payload_dict and "current_version_number" in payload_dict["inputs"]:
              del payload_dict["inputs"]["current_version_number"]
 
-    response = await client.post("/execute", json=payload_dict)
+    response = await client.post("/tools/execute", json=payload_dict)
 
     assert response.status_code == 422, f"Expected 422, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -390,7 +390,7 @@ async def test_update_page_missing_title_and_content_and_parent(mock_get_client,
     if "parent_page_id" not in inputs and "inputs" in payload_dict and "parent_page_id" in payload_dict["inputs"]:
         del payload_dict["inputs"]["parent_page_id"]
 
-    response = await client.post("/execute", json=payload_dict)
+    response = await client.post("/tools/execute", json=payload_dict)
 
     assert response.status_code == 422, f"Expected 422, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -426,7 +426,7 @@ async def test_update_page_invalid_input_types(mock_get_client, client: AsyncCli
         "inputs": inputs
     }
 
-    response = await client.post("/execute", json=raw_payload) # Send raw payload
+    response = await client.post("/tools/execute", json=raw_payload) # Send raw payload
 
     assert response.status_code == 422, f"Expected 422, got {response.status_code}. Response: {response.text}"
     response_data = response.json()
@@ -471,7 +471,7 @@ async def test_update_page_api_error_on_get(mock_get_client, client: AsyncClient
     }
     request_payload = MCPExecuteRequest(tool_name="update_page", inputs=inputs)
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == status_code # Should map ApiError status code
     response_data = response.json()
@@ -515,7 +515,7 @@ async def test_update_page_api_error_on_update(mock_get_client, client: AsyncCli
     }
     request_payload = MCPExecuteRequest(tool_name="update_page", inputs=inputs)
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == status_code
     response_data = response.json()
@@ -552,7 +552,7 @@ async def test_update_page_unexpected_error(mock_get_client, client: AsyncClient
     }
     request_payload = MCPExecuteRequest(tool_name="update_page", inputs=inputs)
 
-    response = await client.post("/execute", json=request_payload.model_dump())
+    response = await client.post("/tools/execute", json=request_payload.model_dump())
 
     assert response.status_code == 500 # Internal Server Error for unexpected exceptions
     response_data = response.json()

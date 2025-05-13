@@ -48,7 +48,7 @@ async def test_delete_page_success(client: AsyncClient, confluence_client_mock: 
     # For now, assume load_tools in main.py registers it.
 
     # --- Execution ---
-    response = await client.post("/execute", json={
+    response = await client.post("/tools/execute", json={
         "tool_name": tool_name,
         "inputs": inputs
     })
@@ -98,7 +98,7 @@ async def test_delete_page_not_found(client: AsyncClient):
     # Use patch.dict to temporarily modify the AVAILABLE_TOOLS dictionary
     with patch.dict('confluence_mcp_server.main.AVAILABLE_TOOLS', values={'delete_page': mock_tool_entry}, clear=False) as mock_available_tools:
         # --- Execution ---
-        response = await client.post("/execute", json={
+        response = await client.post("/tools/execute", json={
             "tool_name": tool_name,
             "inputs": inputs
         })
@@ -131,7 +131,7 @@ async def test_delete_page_permission_denied(client: AsyncClient):
     }
     with patch.dict('confluence_mcp_server.main.AVAILABLE_TOOLS', values={'delete_page': mock_tool_entry}, clear=False) as mock_available_tools:
         # --- Execution ---
-        response = await client.post("/execute", json={
+        response = await client.post("/tools/execute", json={
             "tool_name": tool_name,
             "inputs": inputs
         })
@@ -165,7 +165,7 @@ async def test_delete_page_generic_api_error(client: AsyncClient):
     }
     with patch.dict('confluence_mcp_server.main.AVAILABLE_TOOLS', values={'delete_page': mock_tool_entry}, clear=False) as mock_available_tools:
         # --- Execution ---
-        response = await client.post("/execute", json={
+        response = await client.post("/tools/execute", json={
             "tool_name": tool_name,
             "inputs": inputs
         })
@@ -203,7 +203,7 @@ async def test_delete_page_invalid_input(
     tool_name = "delete_page"
 
     # --- Execution ---
-    response = await client.post("/execute", json={
+    response = await client.post("/tools/execute", json={
         "tool_name": tool_name,
         "inputs": invalid_input
     })

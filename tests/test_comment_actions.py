@@ -63,7 +63,7 @@ async def test_get_comments_success(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -125,7 +125,7 @@ async def test_get_comments_page_not_found(
         "inputs": tool_inputs.model_dump()
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 404
     response_data = response.json()
@@ -167,7 +167,7 @@ async def test_get_comments_no_comments(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -214,7 +214,7 @@ async def test_get_comments_other_api_error(
         "inputs": tool_inputs.model_dump()
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     # --- Final Assertions for Specific HTTPException Handling ---
     # Expecting 503 because the specific HTTPException handler in main.py is now catching the exception
@@ -271,7 +271,7 @@ async def test_add_comment_success(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -311,7 +311,7 @@ async def test_add_comment_reply_success(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -348,7 +348,7 @@ async def test_add_comment_page_not_found(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 404
     response_data = response.json()
@@ -382,7 +382,7 @@ async def test_add_comment_parent_not_found(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 404
     response_data = response.json()
@@ -417,7 +417,7 @@ async def test_add_comment_forbidden(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 403
     response_data = response.json()
@@ -447,7 +447,7 @@ async def test_add_comment_bad_request(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 400
     response_data = response.json()
@@ -476,7 +476,7 @@ async def test_add_comment_api_returns_no_id(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 500 # Should raise HTTPException(500) due to ValueError
     response_data = response.json()
@@ -503,7 +503,7 @@ async def test_add_comment_unexpected_error(
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 500
     response_data = response.json()
@@ -522,7 +522,7 @@ async def test_add_comment_input_validation_missing_required(client: AsyncClient
         "inputs": invalid_inputs
     }
 
-    response = await client.post(f"{BASE_URL}/execute", json=request_payload)
+    response = await client.post(f"{BASE_URL}/tools/execute", json=request_payload)
 
     assert response.status_code == 422 # FastAPI validation error
     response_data = response.json()

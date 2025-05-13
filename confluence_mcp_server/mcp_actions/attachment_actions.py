@@ -5,9 +5,11 @@ from typing import List, Optional
 from atlassian import Confluence
 from atlassian.errors import ApiError
 from fastapi import HTTPException
+import os
 
 from .schemas import (
-    GetAttachmentsInput, AttachmentOutputItem, GetAttachmentsOutput
+    GetAttachmentsInput, AttachmentOutputItem, GetAttachmentsOutput,
+    AddAttachmentInput, AddAttachmentOutput
 )
 
 async def get_attachments_logic(
@@ -153,6 +155,120 @@ async def get_attachments_logic(
         # Catch-all for other unexpected errors, e.g., issues with response parsing or unexpected structure
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while processing attachments: {str(e)}")
 
-# Placeholder for add_attachment_logic
-# async def add_attachment_logic():
-#     pass
+async def add_attachment_logic(
+    client: Confluence,
+    inputs: AddAttachmentInput
+) -> AddAttachmentOutput:
+    """
+    Logic to add an attachment to a Confluence page.
+    """
+    try:
+        # The atlassian-python-api's attach_file returns a dictionary representing the attachment.
+        # Example structure (simplified, based on typical Confluence REST API attachment responses):
+        # {
+        #     'id': 'att12345',
+        #     'type': 'attachment',
+        #     'status': 'current',
+        #     'title': 'new_example.pdf',
+        #     'metadata': {
+        #         'mediaType': 'application/pdf',
+        #         'comment': 'Uploaded via API.'
+        #     },
+        #     'version': {'number': 1, 'when': '2023-10-27T10:00:00.000Z'},
+        #     'extensions': {'fileSize': 102400},
+        #     '_links': {
+        #         'webui': '/display/SPACEKEY/PageTitle?preview=%2Fatt12345%2Fnew_example.pdf',
+        #         'download': '/download/attachments/PAGEID/new_example.pdf?version=1',
+        #         'self': 'https://your-domain.atlassian.net/wiki/rest/api/content/PAGEID/child/attachment/att12345'
+        #     }
+        # }
+
+        # If inputs.filename is None, the library will use the name from inputs.file_path.
+        # Otherwise, inputs.filename will be used as the name of the attachment on Confluence.
+        api_response = client.attach_file(
+            filepath=inputs.file_path,  # This is the local path to the file
+            page_id=inputs.page_id,
+            name=inputs.filename,       # This is the desired name on Confluence
+            comment=inputs.comment,
+            content_type=None # Let the library or Confluence determine this, or specify if needed
+        )
+
+        # The response from attach_file is typically a single attachment object, not a list.
+        # We need to map this to our AttachmentOutputItem structure.
+        item_data = api_response # Assuming api_response is the direct attachment dictionary
+
+        attachment_id_str = str(item_data.get('id'))
+        title = item_data.get('title', 'N/A')
+        status = item_data.get('status', 'unknown')
+        
+        media_type = item_data.get('metadata', {}).get('mediaType')
+        response_comment = item_data.get('metadata', {}).get('comment') # API might return its own comment
+        
+        file_size = item_data.get('extensions', {}).get('fileSize')
+        
+        version_info = item_data.get('version', {})
+        version_number = version_info.get('number')
+        created_date = version_info.get('when')
+
+        links = item_data.get('_links', {})
+        download_link = links.get('download')
+        web_ui_link = links.get('webui')
+
+        return AddAttachmentOutput(
+            attachment_id=attachment_id_str,
+            title=title,
+            status=status,
+            media_type=media_type,
+            file_size=file_size,
+            created_date=created_date,
+            version_number=version_number,
+            download_link=download_link,
+            web_ui_link=web_ui_link,
+            comment=response_comment # Use comment from response, as input comment is for upload action
+        )
+
+    except ApiError as e:
+        api_response_obj = e.response
+        _status_code = 500
+        _reason = "Not specified by API"
+        _url = "N/A"
+
+        if api_response_obj is not None:
+            _status_code = api_response_obj.status_code if isinstance(api_response_obj.status_code, int) else _status_code
+            _reason = api_response_obj.reason if api_response_obj.reason is not None else _reason
+            if hasattr(api_response_obj, 'request') and api_response_obj.request is not None:
+                _url = api_response_obj.request.url if api_response_obj.request.url is not None else _url
+            elif hasattr(api_response_obj, 'url') and api_response_obj.url is not None:
+                _url = api_response_obj.url
+
+        if not isinstance(_status_code, int):
+            _status_code = 500
+        
+        if _status_code == 404:
+            final_detail = (
+                f"Page with ID '{inputs.page_id}' not found, or attachments cannot be added to it. "
+                f"[Confluence API: Status {_status_code}, Reason: '{_reason}', URL: '{_url}']"
+            )
+            raise HTTPException(status_code=404, detail=final_detail)
+        elif _status_code == 409: # Conflict - e.g. attachment with same name already exists and not versioning
+             final_detail = (
+                f"Conflict adding attachment (e.g., name '{inputs.filename or os.path.basename(inputs.file_path)}' may already exist and versioning not supported/allowed). "
+                f"[Confluence API: Status {_status_code}, Reason: '{_reason}', URL: '{_url}']"
+            )
+             raise HTTPException(status_code=409, detail=final_detail)
+        else:
+            detail_message = f"Error adding attachment to Confluence: Status {_status_code}."
+            if _reason and _reason != "Not specified by API":
+                detail_message += f" Reason: '{_reason}'_"
+            if _url and _url != "N/A":
+                detail_message += f" URL: '{_url}'_"
+            detail_message += f" (Attempted for Page ID: '{inputs.page_id}', File: '{inputs.filename or os.path.basename(inputs.file_path)}')"
+            
+            raise HTTPException(status_code=_status_code, detail=detail_message)
+
+    except FileNotFoundError: # From AddAttachmentInput validator, though direct calls might also raise it
+        raise HTTPException(status_code=400, detail=f"File not found at path: {inputs.file_path}")
+    except ValueError as ve: # From AddAttachmentInput validator or other general value errors
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while adding attachment: {str(e)}")

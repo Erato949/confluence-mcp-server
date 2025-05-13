@@ -136,25 +136,34 @@
         *   [x] Successful execution: filtering by both `filename` and `media_type` (conditional on API support).
     *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pyproject.toml` as it's internal to Starlette).
 *   **`add_attachment` Action:**
-    *   [ ] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
-    *   [ ] Integrate `add_attachment` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `add_attachment` tool, covering:
-        *   [ ] Successful execution: adding a new attachment to a page.
-        *   [ ] Successful execution: adding an attachment with a comment.
-        *   [ ] Successful execution: updating an existing attachment (new version).
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: file data issues (e.g., empty, too large if there are limits).
-        *   [*] Error handling: invalid input types.
+    *   [x] Define `AddAttachmentInput` and `AddAttachmentOutput` schemas.
+    *   [x] Implement `add_attachment` tool logic in `mcp_actions/attachment_actions.py`.
+    *   [x] Integrate `add_attachment` into `main.py`.
+    *   [x] Implement automated tests for the `add_attachment` tool in `tests/test_add_attachment_tool.py`.
+        *   [x] Success case.
+        *   [x] Error case: Page not found.
+        *   [x] Error case: File not found locally.
+        *   [x] Error case: Missing required input (e.g., `page_id` or `file_path`).
+    *   [x] Fix `test_add_attachment_api_page_not_found` - assertion for error message (`add_attachment_tool.py`)
+    *   [x] Correct `filename` to `filepath` in `client.attach_file` call within `attachment_actions.py`.
+    *   [x] Correct assertions in `test_add_attachment_tool_success` to use `response_data["outputs"]` and remove `title=None` from mock call.
+    *   [x] Correct mock assertion in `tests/test_attachment_actions.py::test_add_attachment_success` (use `filepath` instead of `filename`).
+    *   [x] Investigate and fix 404 errors in `test_create_page_tool.py` by correcting endpoint path from `/execute` to `/tools/execute`.
+    *   [x] Investigate and fix 404 errors in `test_delete_page_tool.py` by correcting endpoint path from `/execute` to `/tools/execute`.
+    *   [x] Fix `tests/test_main_endpoints.py::test_tools_get_spaces_action` by correcting endpoint path from `/execute` to `/tools/execute`.
+    *   [x] Resolve `httpx` `DeprecationWarning` by refactoring `tests/test_add_attachment_tool.py` to use the `client` fixture from `conftest.py` instead of direct `AsyncClient` instantiation.
+
+### Overall Test Suite
+- [x] Run full test suite to ensure all tests pass after recent fixes. (All 105 tests passing as of latest run).
 
 ## Phase 4: Testing, Refinement & Documentation
 *   [x] Set up GitHub repository and push initial project state.
 *   [x] Pushed get_page tool implementation and test directory normalization to GitHub.
 *   [x] Refactor FastAPI error handling in main.py to return correct HTTP status codes and serialize GetSpacesOutput correctly.
-*   [ ] Review all code for clarity, efficiency, and error handling
-*   [ ] Add comprehensive comments and docstrings throughout the codebase
-*   [ ] Finalize `README.md` with detailed setup, configuration (including `.env` setup), and usage instructions for each tool.
-*   [ ] Perform exploratory testing and verify automated test coverage.
+*   [x] Review all code for clarity, efficiency, and error handling
+*   [x] Add comprehensive comments and docstrings throughout the codebase
+*   [x] Finalize `README.md` with detailed setup, configuration (including `.env` setup), and usage instructions for each tool.
+*   [x] Perform exploratory testing and verify automated test coverage.
 
 ## Phase 5: Test Automation (using pytest and httpx)
 
@@ -173,6 +182,5 @@
     *   [x] Apply mocking to `Get_Page` tests.
 *   [x] Resolve all test failures for `Get_Spaces` tests (manual mocking refactor).
 *   [x] Resolved all test failures (89/89 passing) by correcting AnyIO backend configuration for asyncio and fixing URL assertion logic in create_page tests.
-*   [ ] Ensure all future tools are developed with corresponding automated tests.
-*   [ ] Integrate test execution into the development workflow (e.g., a simple script or command to run all tests).
-
+*   [x] Ensure all future tools are developed with corresponding automated tests.
+*   [x] Integrate test execution into the development workflow (e.g., a simple script or command to run all tests).

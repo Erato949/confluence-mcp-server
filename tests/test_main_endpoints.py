@@ -47,7 +47,7 @@ async def test_tools_get_spaces_action(client: AsyncClient):
         }
 
         # Act
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         # Assert
         assert response.status_code == 200

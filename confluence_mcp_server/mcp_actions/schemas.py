@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, model_validator, validator, constr
+from pydantic import BaseModel, Field, model_validator, validator, field_validator, constr
+import os
 
 class MCPToolSchema(BaseModel):
     """
@@ -398,5 +399,46 @@ class GetAttachmentsOutput(BaseModel):
     limit_used: int = Field(..., description="The limit value used for the API call.")
     start_used: int = Field(..., description="The start value used for the API call.")
     next_start_offset: Optional[int] = Field(None, description="The starting index for the next set of results, if more are available.")
+
+
+class AddAttachmentInput(BaseModel):
+    """
+    Input schema for adding an attachment to a Confluence page.
+    """
+    page_id: str = Field(..., description="The ID of the page to add the attachment to.")
+    file_path: str = Field(..., description="The local file path of the attachment to upload.")
+    filename: Optional[str] = Field(None, description="Optional: The name for the attachment on Confluence. If None, uses the local file's name.")
+    comment: Optional[str] = Field(None, description="Optional: A comment to add with the attachment.")
+
+    @field_validator('file_path')
+    def file_path_must_exist(cls, v):
+        if not os.path.exists(v):
+            raise ValueError(f"File not found at path: {v}")
+        if not os.path.isfile(v):
+            raise ValueError(f"Path is not a file: {v}")
+        return v
+
+class AddAttachmentOutput(AttachmentOutputItem):
+    """
+    Output schema for the add_attachment tool.
+    Inherits from AttachmentOutputItem for consistency.
+    """
+    pass
+
+
+class DeletePageInput(BaseModel):
+    """
+    Input schema for the delete_page tool.
+    Requires the ID of the page to be deleted.
+    """
+    page_id: constr(min_length=1) = Field(..., description="The ID of the Confluence page to delete.")
+
+class DeletePageOutput(BaseModel):
+    """
+    Output schema for the delete_page tool.
+    Confirms the successful deletion of the page.
+    """
+    message: str = Field(..., description="Confirmation message indicating the page was deleted.")
+
 
 # Tool Registry (Example structure, adapt as needed)

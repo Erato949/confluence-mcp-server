@@ -37,13 +37,15 @@ from .mcp_actions.schemas import (
     AddCommentOutput,
     GetAttachmentsInput, 
     AttachmentOutputItem, 
-    GetAttachmentsOutput
+    GetAttachmentsOutput,
+    AddAttachmentInput, 
+    AddAttachmentOutput,
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
 from .mcp_actions.page_actions import get_page_logic, create_page_logic, update_page_logic, delete_page_logic, search_pages_logic
 from .mcp_actions.comment_actions import get_comments_logic, add_comment_logic
-from .mcp_actions.attachment_actions import get_attachments_logic
+from .mcp_actions.attachment_actions import get_attachments_logic, add_attachment_logic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -173,7 +175,7 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "logic": get_spaces_logic
     },
     "create_page": {
-        "description": "Creates a new page in a Confluence space.",
+        "description": "Creates a new Confluence page.",
         "input_schema": CreatePageInput,
         "output_schema": CreatePageOutput,
         "logic": create_page_logic
@@ -203,10 +205,16 @@ AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
         "logic": add_comment_logic
     },
     "get_attachments": {
-        "description": "Retrieves a list of attachments for a specific Confluence page.",
+        "description": "Retrieves a list of attachments for a specified Confluence page.",
         "input_schema": GetAttachmentsInput,
         "output_schema": GetAttachmentsOutput,
         "logic": get_attachments_logic
+    },
+    "Add-Attachment": {
+        "description": "Adds an attachment to a specified Confluence page from a local file.",
+        "input_schema": AddAttachmentInput,
+        "output_schema": AddAttachmentOutput,
+        "logic": add_attachment_logic
     }
 }
 
@@ -351,7 +359,7 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
 
 
 # Include the router AFTER defining the app and the handler
-app.include_router(router)
+app.include_router(router, prefix="/tools")
 
 # --- Main entry point for Uvicorn (if running directly) ---
 if __name__ == "__main__":

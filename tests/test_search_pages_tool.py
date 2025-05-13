@@ -62,7 +62,7 @@ async def test_search_pages_success_basic(mock_get_client, client: AsyncClient, 
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api" 
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -133,7 +133,7 @@ async def test_search_pages_empty_results(mock_get_client, client: AsyncClient, 
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200 # Should still be a success, just with no results
     response_data = response.json()
@@ -179,7 +179,7 @@ async def test_search_pages_api_error(mock_get_client, client: AsyncClient, conf
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 500 # As converted by main.py's/search_pages_logic generic exception handler
     response_data = response.json()
@@ -190,9 +190,13 @@ async def test_search_pages_api_error(mock_get_client, client: AsyncClient, conf
     assert response_data["tool_name"] == "search_pages"
     assert response_data["error_type"] == "HTTPException"
 
-    # Check the error message structure - it includes the exception type and message
-    assert str(simulated_error) in response_data["error_message"]
-
+    # Check if the specific detail from the ConfluenceError is present.
+    # The error message from main.py wraps it: f"Server Error (RuntimeError): Error during CQL search: {e.message}"
+    # If ConfluenceError is caught by page_actions and re-raised as HTTPException, the detail might be different.
+    # Current main.py for HTTPException(detail=str(e.detail)) from logic, or generic for others.
+    # Based on MEMORY[111b01c7-8f2c-4cfd-9ed5-76d8a78df36f], the specific detail should be asserted.
+    assert "Details: Simulated Confluence API Error during CQL search" in response_data["error_message"]
+    
     mock_get_client_func.assert_called_once()
     confluence_client_mock.cql.assert_called_once_with(
         cql=error_cql_query,
@@ -221,7 +225,7 @@ async def test_search_pages_invalid_cql_syntax(mock_get_client, client: AsyncCli
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 500 # search_pages_logic converts generic exceptions to 500
     response_data = response.json()
@@ -233,8 +237,8 @@ async def test_search_pages_invalid_cql_syntax(mock_get_client, client: AsyncCli
     assert response_data["error_type"] == "HTTPException"
 
     # Check the error message structure
-    expected_detail = f"Error during CQL search: {simulated_api_error}" # Detail from logic
-    assert expected_detail in response_data["error_message"]
+    expected_detail = "Exception: Error during CQL search: Confluence API: Invalid CQL syntax provided."
+    assert response_data["error_message"] == expected_detail
 
     mock_get_client_func.assert_called_once()
     confluence_client_mock.cql.assert_called_once_with(
@@ -296,7 +300,7 @@ async def test_search_pages_invalid_input_types(mock_get_client, client: AsyncCl
         "inputs": {**base_inputs, **invalid_input} # Merge base with invalid part
     }
 
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 422 # Unprocessable Entity for Pydantic validation errors
     response_data = response.json()
@@ -347,7 +351,7 @@ async def test_search_pages_api_error(mock_get_client, client: AsyncClient, conf
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 500 # As converted by main.py's/search_pages_logic generic exception handler
     response_data = response.json()
@@ -427,14 +431,14 @@ async def test_search_pages_with_expand_and_excerpt(mock_get_client, client: Asy
     confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     # Explicitly assert how the mock cql method was called by the logic
     confluence_client_mock.cql.assert_called_once_with(
         cql=cql_query,
         limit=1,
         start=0,
-        expand='body.storage,version', # Corrected: expand is a string
+        expand='body.storage,version', # Expect a comma-separated string
         excerpt=excerpt_strategy
     )
 

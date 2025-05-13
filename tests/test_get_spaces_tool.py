@@ -38,7 +38,7 @@ async def test_get_spaces_no_input_successful(client: AsyncClient):
             "inputs": {}
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -102,7 +102,7 @@ async def test_get_spaces_with_limit(client: AsyncClient):
     ]
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=local_mock_confluence_instance) as mock_get_client:
-        response = await client.post("/execute", json=payload)
+        response = await client.post("/tools/execute", json=payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -159,7 +159,7 @@ async def test_get_spaces_with_start(client: AsyncClient):
             "inputs": {"start": start_value, "limit": limit_value}
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -222,7 +222,7 @@ async def test_get_spaces_with_space_ids(client: AsyncClient):
             "inputs": {"space_ids": [space_id_to_fetch]} # Pass as a list, even if one
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -277,7 +277,7 @@ async def test_get_spaces_with_space_keys(client: AsyncClient):
             "inputs": {"space_keys": [space_key_to_fetch]} # Pass as a list
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -329,7 +329,7 @@ async def test_get_spaces_with_space_type(client: AsyncClient):
             "inputs": {"space_type": space_type_value, "limit": 1} # Added limit for predictability
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -381,7 +381,7 @@ async def test_get_spaces_with_space_status(client: AsyncClient):
             "inputs": {"status": space_status_value, "limit": 1} # Added limit
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -440,7 +440,7 @@ async def test_get_spaces_with_combination_of_parameters(client: AsyncClient):
             }
         }
 
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
         assert response.status_code == 200
         response_json = response.json()
@@ -515,7 +515,7 @@ async def test_get_spaces_successful(mock_get_client, client: AsyncClient, confl
             inputs=GetSpacesInput(**inputs).model_dump(exclude_none=True)
         )
 
-        response = await client.post("/execute", json=request_payload.model_dump()) # Keep model_dump for now
+        response = await client.post("/tools/execute", json=request_payload.model_dump()) # Keep model_dump for now
 
         assert response.status_code == 200
         response_data = response.json()
@@ -562,7 +562,7 @@ async def test_get_spaces_no_match(mock_get_client, client: AsyncClient, conflue
         )
 
         # Act
-        response = await client.post("/execute", json=request_payload.model_dump()) # Changed .dict() to .model_dump()
+        response = await client.post("/tools/execute", json=request_payload.model_dump()) # Changed .dict() to .model_dump()
 
         # Assert
         assert response.status_code == 200

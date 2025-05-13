@@ -64,7 +64,7 @@ async def test_get_page_success(mock_get_client, client: AsyncClient, confluence
     AVAILABLE_TOOLS["get_page"]["logic"] = manual_mock_logic
 
     try:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
     finally:
         AVAILABLE_TOOLS["get_page"]["logic"] = original_logic
 
@@ -95,7 +95,7 @@ async def test_get_page_with_expand_success(mock_get_client, client: AsyncClient
     )
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -121,7 +121,7 @@ async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluen
     confluence_client_mock.get_page_by_id.return_value = None # Simulate API not finding the page
     mock_get_client.return_value = confluence_client_mock
 
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 404
     response_data = response.json()
@@ -141,7 +141,7 @@ async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient)
         "tool_name": "get_page",
         "inputs": {"page_id": "not_an_integer"}
     }
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 422
     response_data = response.json()
@@ -172,7 +172,7 @@ async def test_get_page_api_error(mock_get_client, client: AsyncClient, confluen
     AVAILABLE_TOOLS["get_page"]["logic"] = manual_mock_logic
 
     try:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
     finally:
         AVAILABLE_TOOLS["get_page"]["logic"] = original_logic
 
@@ -228,7 +228,7 @@ async def test_get_page_by_space_key_and_title_success(mock_get_client, client: 
         web_url=f"{MOCK_CONFLUENCE_WEB_BASE_URL}{mock_api_response['_links']['webui']}"
     )
 
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -261,7 +261,7 @@ async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client
     confluence_client_mock.get_page_by_title.return_value = None # Simulate API not finding the page
     mock_get_client.return_value = confluence_client_mock
 
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 404
     response_data = response.json()
@@ -298,7 +298,7 @@ async def test_get_page_invalid_input_combinations(mock_get_client, client: Asyn
         "tool_name": "get_page",
         "inputs": invalid_payload
     }
-    response = await client.post("/execute", json=request_payload)
+    response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 422
     response_data = response.json()
@@ -380,7 +380,7 @@ async def test_get_page_minimal_content_success(mock_get_client, client: AsyncCl
     )
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()
@@ -430,7 +430,7 @@ async def test_get_page_minimal_content_no_version_or_body_expand(mock_get_clien
     mock_get_client.return_value = confluence_client_mock
 
     with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
+        response = await client.post("/tools/execute", json=request_payload)
 
     assert response.status_code == 200
     response_data = response.json()["outputs"]
