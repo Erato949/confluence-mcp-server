@@ -141,9 +141,9 @@ async def get_attachments_logic(
             # General ApiError handling for other status codes
             detail_message = f"Error getting attachments from Confluence: Status {_status_code}."
             if _reason and _reason != "Not specified by API": # Check _reason is not None or empty
-                detail_message += f" Reason: '{_reason}'."
+                detail_message += f" Reason: '{_reason}'_" # Corrected to underscore
             if _url and _url != "N/A": # Check _url is not None or empty
-                detail_message += f" URL: '{_url}'."
+                detail_message += f" URL: '{_url}'_" # Corrected to underscore
             # It's good practice to include the relevant input identifier if possible
             detail_message += f" (Attempted for Page ID: '{inputs.page_id}')"
             
