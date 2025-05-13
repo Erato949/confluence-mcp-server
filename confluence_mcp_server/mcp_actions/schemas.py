@@ -288,6 +288,18 @@ class UpdatePageOutput(BaseModel):
     url: str = Field(..., description="The web URL of the page.")
 
 
+# --- Delete Page Schemas ---
+
+class DeletePageInput(BaseModel):
+    """Input schema for deleting a Confluence page."""
+    page_id: str = Field(..., description="The ID of the page to delete.")
+
+class DeletePageOutput(BaseModel):
+    """Output schema after attempting to delete a Confluence page."""
+    success: bool = Field(..., description="Indicates whether the page deletion was successful.")
+    message: Optional[str] = Field(None, description="An optional message providing details about the deletion status.")
+
+
 # --- Get Comments Schemas ---
 
 class GetCommentsInput(BaseModel):
