@@ -267,7 +267,7 @@ async def test_add_comment_success(
 
     tool_inputs = AddCommentInput(page_id="12345", body="<p>Test top-level comment</p>")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -277,7 +277,7 @@ async def test_add_comment_success(
     response_data = response.json()
     
     assert response_data["status"] == "success"
-    assert response_data["tool_name"] == "Add_Comment"
+    assert response_data["tool_name"] == "add_comment"
     outputs = response_data.get("outputs")
     assert outputs is not None
     assert outputs["comment_id"] == "67890"
@@ -307,7 +307,7 @@ async def test_add_comment_reply_success(
         parent_comment_id="67890" # Provide parent ID
     )
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -344,7 +344,7 @@ async def test_add_comment_page_not_found(
 
     tool_inputs = AddCommentInput(page_id="invalid-page", body="<p>Test comment</p>")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -378,7 +378,7 @@ async def test_add_comment_parent_not_found(
 
     tool_inputs = AddCommentInput(page_id="12345", body="<p>Test reply</p>", parent_comment_id="invalid-parent")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -413,7 +413,7 @@ async def test_add_comment_forbidden(
 
     tool_inputs = AddCommentInput(page_id="restricted-page", body="<p>Test comment</p>")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -443,7 +443,7 @@ async def test_add_comment_bad_request(
 
     tool_inputs = AddCommentInput(page_id="12345", body="Invalid body format") # Not valid storage format
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -472,7 +472,7 @@ async def test_add_comment_api_returns_no_id(
 
     tool_inputs = AddCommentInput(page_id="12345", body="<p>Test comment</p>")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -499,7 +499,7 @@ async def test_add_comment_unexpected_error(
 
     tool_inputs = AddCommentInput(page_id="12345", body="<p>Test comment</p>")
     request_payload = {
-        "tool_name": "Add_Comment", 
+        "tool_name": "add_comment", 
         "inputs": tool_inputs.model_dump(exclude_none=True)
     }
 
@@ -518,7 +518,7 @@ async def test_add_comment_input_validation_missing_required(client: AsyncClient
     # Missing 'body' which is required
     invalid_inputs = {"page_id": "12345"} 
     request_payload = {
-        "tool_name": "Add_Comment",
+        "tool_name": "add_comment",
         "inputs": invalid_inputs
     }
 

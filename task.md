@@ -124,29 +124,34 @@
         *   [x] Error handling: parent comment not found.
         *   [x] Error handling: invalid input types.
 *   **`get_attachments` Action:**
-    *   [ ] Define `get_attachments` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `get_attachments_logic` function in `mcp_actions/attachment_actions.py`
-    *   [ ] Integrate `get_attachments` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `get_attachments` tool, covering:
-        *   [ ] Successful execution: fetching attachments for a page with attachments.
-        *   [ ] Successful execution: filtering by `filename`.
-        *   [ ] Successful execution: filtering by `media_type`.
-        *   [ ] Successful execution: with `limit` and `start` parameters.
-        *   [ ] Behavior: page has no attachments.
-        *   [ ] Behavior: page has no attachments matching filters.
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `get_attachments` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `get_attachments_logic` function in `mcp_actions/attachment_actions.py`
+    *   [x] Integrate `get_attachments` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `get_attachments` tool, covering:
+        *   [x] Successful execution: fetching attachments for a page with attachments.
+        *   [x] Successful execution: filtering by `filename`.
+        *   [x] Successful execution: filtering by `media_type`.
+        *   [x] Successful execution: with `limit` and `start` parameters.
+        *   [x] Behavior: page has no attachments.
+        *   [x] Behavior: page has no attachments matching filters.
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: invalid input types.
+        *   [x] Error handling: other Confluence API errors (e.g., 500, 403).
+        *   [x] Pagination edge case: `limit=0`.
+        *   [x] Pagination edge case: `start` index exceeding available items.
+        *   [x] Successful execution: filtering by both `filename` and `media_type` (conditional on API support).
+    *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pyproject.toml` as it's internal to Starlette).
 *   **`add_attachment` Action:**
-    *   [ ] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
-    *   [ ] Integrate `add_attachment` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `add_attachment` tool, covering:
-        *   [ ] Successful execution: adding a new attachment to a page.
-        *   [ ] Successful execution: adding an attachment with a comment.
-        *   [ ] Successful execution: updating an existing attachment (new version).
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: file data issues (e.g., empty, too large if there are limits).
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
+    *   [x] Integrate `add_attachment` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `add_attachment` tool, covering:
+        *   [x] Successful execution: adding a new attachment to a page.
+        *   [x] Successful execution: adding an attachment with a comment.
+        *   [x] Successful execution: updating an existing attachment (new version).
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: file data issues (e.g., empty, too large if there are limits).
+        *   [x] Error handling: invalid input types.
 
 ## Phase 4: Testing, Refinement & Documentation
 *   [x] Set up GitHub repository and push initial project state.

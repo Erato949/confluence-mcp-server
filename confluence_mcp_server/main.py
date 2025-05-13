@@ -29,17 +29,21 @@ from .mcp_actions.schemas import (
     CreatePageOutput,
     UpdatePageInput, 
     UpdatePageOutput, 
-    GetCommentsInput, # Added for get_comments tool
-    GetCommentsOutput, # Added for get_comments tool
-    DeletePageInput, # Added for delete_page tool
-    DeletePageOutput, # Added for delete_page tool
-    AddCommentInput,  # Added for add_comment tool
-    AddCommentOutput # Added for add_comment tool
+    GetCommentsInput, 
+    GetCommentsOutput, 
+    DeletePageInput, 
+    DeletePageOutput, 
+    AddCommentInput,  
+    AddCommentOutput,
+    GetAttachmentsInput, 
+    AttachmentOutputItem, 
+    GetAttachmentsOutput
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
-from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic, update_page_logic, delete_page_logic # Added delete_page_logic
-from .mcp_actions.comment_actions import get_comments_logic, add_comment_logic # Added add_comment_logic
+from .mcp_actions.page_actions import get_page_logic, create_page_logic, update_page_logic, delete_page_logic, search_pages_logic
+from .mcp_actions.comment_actions import get_comments_logic, add_comment_logic
+from .mcp_actions.attachment_actions import get_attachments_logic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -149,82 +153,65 @@ async def api_error_handler(request: Request, exc: ApiError):
 # --- END CUSTOM EXCEPTION HANDLER ---
 
 # --- In-memory store for tool definitions ---
-AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {}
-
-# --- Helper function to load tool definitions ---
-def load_tools():
-    """
-    Loads and registers tool definitions.
-    """
-    # Define and register the get_spaces tool
-    AVAILABLE_TOOLS['get_spaces'] = {
-        "description": "Retrieves a list of spaces from Confluence. Allows optional filtering by space type, and pagination using limit and start.",
-        "input_schema": GetSpacesInput,
-        "output_schema": GetSpacesOutput,
-        "logic": get_spaces_logic
-    }
-
-    # Get Page Tool Definition
-    AVAILABLE_TOOLS['Get_Page'] = {
-        "description": "Fetches a specific page by ID or by space key and title.",
+AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
+    "get_page": {
+        "description": "Retrieves details of a specific Confluence page by its ID, or by space key and title.",
         "input_schema": GetPageInput,
         "output_schema": GetPageOutput,
-        "logic": get_page_logic  # Reference the logic function
-    }
-
-    # Search Pages Tool Definition
-    AVAILABLE_TOOLS['search_pages'] = {
-        "description": "Searches for pages using Confluence Query Language (CQL) or basic filters.",
+        "logic": get_page_logic
+    },
+    "search_pages": {
+        "description": "Searches for Confluence pages using CQL (Confluence Query Language) or a simple query string.",
         "input_schema": SearchPagesInput,
         "output_schema": SearchPagesOutput,
         "logic": search_pages_logic
-    }
-    
-    # Create Page Tool Definition
-    AVAILABLE_TOOLS['create_page'] = {
+    },
+    "get_spaces": {
+        "description": "Retrieves a list of Confluence spaces, with optional filtering.",
+        "input_schema": GetSpacesInput,
+        "output_schema": GetSpacesOutput,
+        "logic": get_spaces_logic
+    },
+    "create_page": {
         "description": "Creates a new page in a Confluence space.",
         "input_schema": CreatePageInput,
         "output_schema": CreatePageOutput,
         "logic": create_page_logic
-    }
-
-    # Update Page Tool Definition
-    AVAILABLE_TOOLS['update_page'] = {
-        "description": "Updates an existing page's title, content, or parent.",
+    },
+    "update_page": {
+        "description": "Updates an existing Confluence page.",
         "input_schema": UpdatePageInput,
         "output_schema": UpdatePageOutput,
         "logic": update_page_logic
-    }
-
-    # Get Comments Tool Definition
-    AVAILABLE_TOOLS['get_comments'] = {
+    },
+    "delete_page": {
+        "description": "Deletes a Confluence page. This is a permanent action.",
+        "input_schema": DeletePageInput,
+        "output_schema": DeletePageOutput,
+        "logic": delete_page_logic
+    },
+    "get_comments": {
         "description": "Retrieves comments for a specific Confluence page.",
         "input_schema": GetCommentsInput,
         "output_schema": GetCommentsOutput,
         "logic": get_comments_logic
-    }
-
-    # Add Comment Tool Definition
-    AVAILABLE_TOOLS['Add_Comment'] = {
-        "description": "Adds a new comment to a Confluence page, optionally as a reply to an existing comment.",
+    },
+    "add_comment": {
+        "description": "Adds a new comment to a Confluence page.",
         "input_schema": AddCommentInput,
         "output_schema": AddCommentOutput,
         "logic": add_comment_logic
+    },
+    "get_attachments": {
+        "description": "Retrieves a list of attachments for a specific Confluence page.",
+        "input_schema": GetAttachmentsInput,
+        "output_schema": GetAttachmentsOutput,
+        "logic": get_attachments_logic
     }
-
-    # Delete Page Tool Definition
-    AVAILABLE_TOOLS['delete_page'] = {
-        "description": "Deletes a specific page by its ID.",
-        "input_schema": DeletePageInput,
-        "output_schema": DeletePageOutput,
-        "logic": delete_page_logic
-    }
-
-    print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")
+}
 
 # Call load_tools at startup to populate AVAILABLE_TOOLS
-load_tools()
-
+print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")
 
 # --- API Endpoints ---
 router = APIRouter()

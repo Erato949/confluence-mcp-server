@@ -35,7 +35,7 @@ pytestmark = pytest.mark.anyio
 async def test_get_page_success(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful retrieval of a page by ID."""
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": MOCK_PAGE_ID, "expand": "body.storage,version"}
     }
     mock_api_response = get_mock_confluence_page_data(expand="body.storage,version")
@@ -60,13 +60,13 @@ async def test_get_page_success(mock_get_client, client: AsyncClient, confluence
         return expected_output_model
 
     manual_mock_logic = AsyncMock(side_effect=mock_logic_side_effect)
-    original_logic = AVAILABLE_TOOLS["Get_Page"]["logic"]
-    AVAILABLE_TOOLS["Get_Page"]["logic"] = manual_mock_logic
+    original_logic = AVAILABLE_TOOLS["get_page"]["logic"]
+    AVAILABLE_TOOLS["get_page"]["logic"] = manual_mock_logic
 
     try:
         response = await client.post("/execute", json=request_payload)
     finally:
-        AVAILABLE_TOOLS["Get_Page"]["logic"] = original_logic
+        AVAILABLE_TOOLS["get_page"]["logic"] = original_logic
 
     assert response.status_code == 200, f"Response content: {response.text}"
 
@@ -75,7 +75,7 @@ async def test_get_page_with_expand_success(mock_get_client, client: AsyncClient
     """Test successful retrieval with expand parameter."""
     expand_params = "body.storage,version"
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": MOCK_PAGE_ID, "expand": expand_params}
     }
     mock_api_response = get_mock_confluence_page_data(expand=expand_params)
@@ -113,7 +113,7 @@ async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluen
     """Test Get_Page tool when the page ID is not found."""
     non_existent_page_id = 99999
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": non_existent_page_id, "expand": None}
     }
 
@@ -128,7 +128,7 @@ async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluen
     assert response_data["status"] == "error"
     assert response_data["error_type"] == "HTTPException"
     assert f"Page with ID {non_existent_page_id} not found" in response_data["error_message"]
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
 
     # Assert that the underlying client mock was called correctly with keyword arguments
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=non_existent_page_id, expand=None)
@@ -138,7 +138,7 @@ async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluen
 async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient):
     """Test Get_Page tool with invalid input type for page_id."""
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": "not_an_integer"}
     }
     response = await client.post("/execute", json=request_payload)
@@ -146,7 +146,7 @@ async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient)
     assert response.status_code == 422
     response_data = response.json()
     assert response_data["status"] == "error"
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
     assert response_data["error_message"] == "Input validation failed."
     assert response_data["error_type"] == "InputValidationError"
     assert "validation_details" in response_data # Check for presence of validation_details
@@ -157,7 +157,7 @@ async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient)
 async def test_get_page_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page tool when the Confluence API call (simulated by logic mock) raises an unexpected error."""
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": MOCK_PAGE_ID, "expand": "body.storage"}
     }
 
@@ -168,18 +168,18 @@ async def test_get_page_api_error(mock_get_client, client: AsyncClient, confluen
 
     # Create manual mock for the logic function that raises an error
     manual_mock_logic = AsyncMock(side_effect=RuntimeError("Simulated API error"))
-    original_logic = AVAILABLE_TOOLS["Get_Page"]["logic"]
-    AVAILABLE_TOOLS["Get_Page"]["logic"] = manual_mock_logic
+    original_logic = AVAILABLE_TOOLS["get_page"]["logic"]
+    AVAILABLE_TOOLS["get_page"]["logic"] = manual_mock_logic
 
     try:
         response = await client.post("/execute", json=request_payload)
     finally:
-        AVAILABLE_TOOLS["Get_Page"]["logic"] = original_logic
+        AVAILABLE_TOOLS["get_page"]["logic"] = original_logic
 
     assert response.status_code == 500 # As converted by main.py's generic exception handler
     response_data = response.json()
     assert response_data["status"] == "error"
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
     assert "An unexpected error occurred" in response_data["error_message"]
     assert "Simulated API error" in response_data["error_message"] # The original error string
     assert response_data["error_type"] == "ToolLogicError" # As set by main.py's generic handler
@@ -199,7 +199,7 @@ async def test_get_page_by_space_key_and_title_success(mock_get_client, client: 
     target_expand = "body.storage,version"
 
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {
             "space_key": target_space_key,
             "title": target_title,
@@ -234,7 +234,7 @@ async def test_get_page_by_space_key_and_title_success(mock_get_client, client: 
     response_data = response.json()
     assert response_data["status"] == "success"
     assert response_data["outputs"] == expected_output.model_dump(exclude_none=False) # Compare with serialized model
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
 
     # Assert that the underlying client mock was called correctly with keyword arguments
     mock_get_client.assert_called_once()
@@ -250,7 +250,7 @@ async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client
     target_expand = "version"
 
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {
             "space_key": target_space_key,
             "title": non_existent_title,
@@ -270,7 +270,7 @@ async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client
     # Assert the specific error message format from the actual logic
     expected_error_detail = f"Page with title '{non_existent_title}' in space '{target_space_key}' not found."
     assert response_data["error_message"] == expected_error_detail
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
 
     # Assert that the underlying client mock was called correctly with keyword arguments
     confluence_client_mock.get_page_by_title.assert_called_once_with(
@@ -295,7 +295,7 @@ async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client
 async def test_get_page_invalid_input_combinations(mock_get_client, client: AsyncClient, invalid_payload: dict, expected_error_message_part: str):
     """Test Get_Page tool with various invalid combinations of input parameters."""
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": invalid_payload
     }
     response = await client.post("/execute", json=request_payload)
@@ -303,7 +303,7 @@ async def test_get_page_invalid_input_combinations(mock_get_client, client: Asyn
     assert response.status_code == 422
     response_data = response.json()
     assert response_data["status"] == "error"
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
     # Check the main error message structure
     assert response_data["error_message"] == "Input validation failed."
     
@@ -361,7 +361,7 @@ async def test_get_page_minimal_content_success(mock_get_client, client: AsyncCl
     confluence_client_mock.url = MOCK_CONFLUENCE_WEB_BASE_URL.rstrip('/wiki') + "/rest/api"
 
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {
             "page_id": page_id_to_test,
             "expand": "body.storage,version" # Requesting them, but they won't be there
@@ -385,7 +385,7 @@ async def test_get_page_minimal_content_success(mock_get_client, client: AsyncCl
     assert response.status_code == 200
     response_data = response.json()
     assert response_data["status"] == "success"
-    assert response_data["tool_name"] == "Get_Page"
+    assert response_data["tool_name"] == "get_page"
     outputs = response_data["outputs"]
 
     assert outputs["page_id"] == page_id_to_test
@@ -423,7 +423,7 @@ async def test_get_page_minimal_content_no_version_or_body_expand(mock_get_clien
     confluence_client_mock.url = MOCK_CONFLUENCE_WEB_BASE_URL.rstrip('/wiki') + "/rest/api"
 
     request_payload = {
-        "tool_name": "Get_Page",
+        "tool_name": "get_page",
         "inputs": {"page_id": page_id_to_test, "expand": "some.other.field"} # Test with an expand not asking for body/version
     }
 

@@ -360,4 +360,43 @@ class AddCommentOutput(BaseModel):
     # url: Optional[str] = Field(None, description="Direct URL to the new comment, if available from the API response.") # URL might be complex to construct/retrieve reliably
 
 
+# --- Schemas for 'get_attachments' tool ---
+
+class AttachmentOutputItem(BaseModel):
+    """
+    Represents a single attachment item.
+    """
+    attachment_id: str = Field(..., description="The ID of the attachment.")
+    title: str = Field(..., description="The filename of the attachment.")
+    status: str = Field(..., description="The status of the attachment (e.g., 'current').")
+    media_type: Optional[str] = Field(None, description="The media type (MIME type) of the attachment.")
+    file_size: Optional[int] = Field(None, description="The size of the attachment in bytes.")
+    created_date: Optional[str] = Field(None, description="The date and time the attachment version was created (ISO 8601 format).")
+    version_number: Optional[int] = Field(None, description="The version number of the attachment.")
+    download_link: Optional[str] = Field(None, description="The relative download link for the attachment.")
+    web_ui_link: Optional[str] = Field(None, description="The link to the attachment in the Confluence web UI.")
+    comment: Optional[str] = Field(None, description="The comment associated with this version of the attachment.")
+
+class GetAttachmentsInput(BaseModel):
+    """
+    Input schema for the get_attachments tool.
+    """
+    page_id: str = Field(..., description="The ID of the Confluence page from which to retrieve attachments.", examples=["12345"])
+    filename: Optional[str] = Field(None, description="Filter attachments by filename.", examples=["mydocument.pdf"])
+    media_type: Optional[str] = Field(None, description="Filter attachments by media type (MIME type).", examples=["application/pdf"])
+    limit: Optional[int] = Field(25, description="Maximum number of attachments to return. Default is 25.", gt=0, le=100, examples=[10])
+    start: Optional[int] = Field(0, description="Starting index for pagination (0-based). Default is 0.", ge=0, examples=[0])
+    # expand: Optional[str] = Field(None, description="A comma-separated list of properties to expand. E.g., 'version'.") # The API doesn't seem to use expand for attachments list broadly
+
+class GetAttachmentsOutput(BaseModel):
+    """
+    Output schema for the get_attachments tool.
+    """
+    attachments: List[AttachmentOutputItem] = Field(..., description="A list of attachments for the page.")
+    retrieved_count: int = Field(..., description="The number of attachments returned in this response.")
+    total_available: Optional[int] = Field(None, description="The total number of attachments available on the page matching the filters (if known from API).")
+    limit_used: int = Field(..., description="The limit value used for the API call.")
+    start_used: int = Field(..., description="The start value used for the API call.")
+    next_start_offset: Optional[int] = Field(None, description="The starting index for the next set of results, if more are available.")
+
 # Tool Registry (Example structure, adapt as needed)
