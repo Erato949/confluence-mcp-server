@@ -10,7 +10,8 @@ from confluence_mcp_server.mcp_actions.schemas import (
     SpaceSchema
 )
 
-@pytest.mark.asyncio
+pytestmark = pytest.mark.anyio
+
 async def test_get_spaces_no_input_successful(client: AsyncClient):
     """Test successful execution of get_spaces tool with no inputs."""
     mock_spaces_data = {
@@ -60,7 +61,6 @@ async def test_get_spaces_no_input_successful(client: AsyncClient):
         mock_confluence_instance.get_all_spaces.assert_called_once_with()
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_limit(client: AsyncClient): 
     limit_value = 1
     payload = {
@@ -128,7 +128,6 @@ async def test_get_spaces_with_limit(client: AsyncClient):
         )
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_start(client: AsyncClient):
     """Test successful execution of get_spaces tool with the start parameter."""
     start_value = 1
@@ -188,7 +187,6 @@ async def test_get_spaces_with_start(client: AsyncClient):
         )
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_space_ids(client: AsyncClient):
     """Test successful execution of get_spaces tool with the space_ids parameter."""
     space_id_to_fetch = 123
@@ -251,7 +249,6 @@ async def test_get_spaces_with_space_ids(client: AsyncClient):
         mock_confluence_instance.get_all_spaces.assert_not_called() # Ensure get_all_spaces wasn't called
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_space_keys(client: AsyncClient):
     """Test successful execution of get_spaces tool with the space_keys parameter."""
     space_key_to_fetch = "TESTKEY"
@@ -307,7 +304,6 @@ async def test_get_spaces_with_space_keys(client: AsyncClient):
         mock_confluence_instance.get_all_spaces.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_space_type(client: AsyncClient):
     """Test successful execution of get_spaces tool with the space_type parameter."""
     space_type_value = "personal"
@@ -360,7 +356,6 @@ async def test_get_spaces_with_space_type(client: AsyncClient):
         )
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_space_status(client: AsyncClient):
     """Test successful execution of get_spaces tool with the space_status parameter."""
     space_status_value = "archived"
@@ -413,7 +408,6 @@ async def test_get_spaces_with_space_status(client: AsyncClient):
         )
 
 
-@pytest.mark.asyncio
 async def test_get_spaces_with_combination_of_parameters(client: AsyncClient):
     """Test successful execution with a combination of limit, space_type, and status."""
     limit_value = 1
@@ -474,7 +468,6 @@ async def test_get_spaces_with_combination_of_parameters(client: AsyncClient):
         )
 
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_spaces_successful(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful retrieval of spaces using manual logic mock."""
@@ -547,7 +540,6 @@ async def test_get_spaces_successful(mock_get_client, client: AsyncClient, confl
         AVAILABLE_TOOLS["get_spaces"]["logic"] = original_logic
 
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_spaces_no_match(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful execution of get_spaces when the logic function returns no results (manual mock)."""

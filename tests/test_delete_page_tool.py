@@ -79,7 +79,6 @@ async def test_delete_page_success(client: AsyncClient, confluence_client_mock: 
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_page_not_found(client: AsyncClient): 
     """
     Test deleting a page that does not exist (API returns 404).
@@ -114,7 +113,6 @@ async def test_delete_page_not_found(client: AsyncClient):
     assert response_data["outputs"] is None
 
 
-@pytest.mark.asyncio
 async def test_delete_page_permission_denied(client: AsyncClient): 
     """
     Test deleting a page when permissions are insufficient (API returns 403).
@@ -148,7 +146,6 @@ async def test_delete_page_permission_denied(client: AsyncClient):
     assert response_data["outputs"] is None
 
 
-@pytest.mark.asyncio
 async def test_delete_page_generic_api_error(client: AsyncClient): 
     """
     Test handling of a generic API error during page deletion (e.g., 500).

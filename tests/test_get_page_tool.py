@@ -29,7 +29,8 @@ from confluence_mcp_server.mcp_actions.schemas import (
 
 from confluence_mcp_server.main import AVAILABLE_TOOLS
 
-@pytest.mark.asyncio
+pytestmark = pytest.mark.anyio
+
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_success(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful retrieval of a page by ID."""
@@ -69,7 +70,6 @@ async def test_get_page_success(mock_get_client, client: AsyncClient, confluence
 
     assert response.status_code == 200, f"Response content: {response.text}"
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_with_expand_success(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful retrieval with expand parameter."""
@@ -108,7 +108,6 @@ async def test_get_page_with_expand_success(mock_get_client, client: AsyncClient
     mock_get_client_func.assert_called_once()
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=MOCK_PAGE_ID, expand=expand_params)
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page tool when the page ID is not found."""
@@ -135,7 +134,6 @@ async def test_get_page_not_found(mock_get_client, client: AsyncClient, confluen
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=non_existent_page_id, expand=None)
     mock_get_client.assert_called_once()
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient):
     """Test Get_Page tool with invalid input type for page_id."""
@@ -155,7 +153,6 @@ async def test_get_page_invalid_input_type(mock_get_client, client: AsyncClient)
     # Optionally, check specific details if consistent
     # Example: assert any("Input should be a valid integer" in detail["msg"] for detail in response_data["validation_details"])
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page tool when the Confluence API call (simulated by logic mock) raises an unexpected error."""
@@ -194,7 +191,6 @@ async def test_get_page_api_error(mock_get_client, client: AsyncClient, confluen
 
 # <START OF NEW TEST CASES>
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_by_space_key_and_title_success(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful retrieval of a page by space key and title."""
@@ -246,7 +242,6 @@ async def test_get_page_by_space_key_and_title_success(mock_get_client, client: 
         space=target_space_key, title=target_title, expand=target_expand
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page tool when a page by space_key and title is not found."""
@@ -283,7 +278,6 @@ async def test_get_page_by_space_key_and_title_not_found(mock_get_client, client
     )
     mock_get_client.assert_called_once()
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 @pytest.mark.parametrize(
     "invalid_payload, expected_error_message_part",
@@ -351,7 +345,6 @@ async def test_get_page_invalid_input_combinations(mock_get_client, client: Asyn
 
 # <END OF NEW TEST CASES>
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_minimal_content_success(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page tool for a page that exists but has no content or version, even when expanded."""
@@ -410,7 +403,6 @@ async def test_get_page_minimal_content_success(mock_get_client, client: AsyncCl
         expand="body.storage,version"
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_get_page_minimal_content_no_version_or_body_expand(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test Get_Page with minimal content (no body/version in expand, or they don't exist on page)."""

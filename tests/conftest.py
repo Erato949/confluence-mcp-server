@@ -101,6 +101,10 @@ def get_mock_cql_search_results(cql_query: str, results: list, limit: int, start
 # Custom event_loop fixture removed.
 # Pytest-asyncio will provide the event loop based on the asyncio marker's scope in test files.
 
+@pytest.fixture
+def anyio_backend():
+    return 'asyncio'
+
 @pytest.fixture(scope="function")
 def client(request) -> AsyncClient:
     """

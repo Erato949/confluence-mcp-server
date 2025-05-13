@@ -6,8 +6,7 @@ from unittest.mock import AsyncMock
 from confluence_mcp_server.main import app, AVAILABLE_TOOLS
 from confluence_mcp_server.mcp_actions.schemas import GetSpacesOutput, SpaceSchema, GetSpacesInput
 
-# Mark all tests in this file for pytest-asyncio with a session-scoped event loop
-pytestmark = pytest.mark.asyncio(scope='session')
+pytestmark = pytest.mark.anyio
 
 async def test_health_check(client: AsyncClient):
     """Test the /health endpoint with diagnostics."""
@@ -20,7 +19,6 @@ async def test_health_check(client: AsyncClient):
     # Expect 'initialized' since .env is loaded
     assert response.json() == {"status": "ok", "message": "Confluence MCP Server is running", "confluence_client_status": "initialized"}
 
-@pytest.mark.asyncio
 async def test_tools_get_spaces_action(client: AsyncClient):
     """Test the /execute endpoint with the 'get_spaces' tool, mocking the logic layer manually."""
     print(f"DEBUG: Inside test_tools_get_spaces_action, client object is: {client}")

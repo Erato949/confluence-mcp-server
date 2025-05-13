@@ -8,6 +8,8 @@ from atlassian.errors import ApiError # Import ApiError
 from confluence_mcp_server.main import app # AVAILABLE_TOOLS is populated when app is imported
 from confluence_mcp_server.mcp_actions.schemas import UpdatePageInput, UpdatePageOutput, MCPExecuteRequest
 
+pytestmark = pytest.mark.anyio
+
 @pytest.fixture
 def confluence_client_mock():
     mock = MagicMock(spec=["get_page_by_id", "update_page", "url"]) # Specify mocked methods
@@ -19,7 +21,6 @@ def confluence_client_mock():
     mock.update_page = MagicMock()
     return mock
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_success_title_only(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test updating only the title successfully."""
@@ -102,7 +103,6 @@ async def test_update_page_success_title_only(mock_get_client, client: AsyncClie
     # Verify get_page_by_id was called to fetch content and space key
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=page_id, expand='body.storage,version,space')
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_success_content_only(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test updating only the content successfully."""
@@ -172,7 +172,6 @@ async def test_update_page_success_content_only(mock_get_client, client: AsyncCl
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=page_id, expand='body.storage,version,space')
 
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_success_title_and_content(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test updating both title and content successfully."""
@@ -238,7 +237,6 @@ async def test_update_page_success_title_and_content(mock_get_client, client: As
 
 # ----- START OF FIXED PARENT/VALIDATION TESTS -----
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_success_parent_page_id_only(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test 'updating' parent_page_id: logic fetches others & updates without parent_id."""
@@ -316,7 +314,6 @@ async def test_update_page_success_parent_page_id_only(mock_get_client, client: 
 
 # === Input Validation Tests ===
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Still need to patch
 async def test_update_page_missing_page_id(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test request missing required page_id."""
@@ -346,7 +343,6 @@ async def test_update_page_missing_page_id(mock_get_client, client: AsyncClient,
     assert any(err["loc"] == ['page_id'] and err["msg"] == "Field required" for err in response_data.get("validation_details", [])), "Missing page_id error not found"
     confluence_client_mock.update_page.assert_not_called() # API should not be called
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_missing_version(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test request missing required current_version_number."""
@@ -373,7 +369,6 @@ async def test_update_page_missing_version(mock_get_client, client: AsyncClient,
     assert any(err["loc"] == ['current_version_number'] and err["msg"] == "Field required" for err in response_data.get("validation_details", [])), "Missing version error not found"
     confluence_client_mock.update_page.assert_not_called()
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_missing_title_and_content_and_parent(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test request missing all updatable fields (model validator)."""
@@ -413,7 +408,6 @@ async def test_update_page_missing_title_and_content_and_parent(mock_get_client,
     confluence_client_mock.update_page.assert_not_called()
 
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_invalid_input_types(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test request with invalid data types for inputs."""
@@ -452,7 +446,6 @@ async def test_update_page_invalid_input_types(mock_get_client, client: AsyncCli
 
 # === Error Handling Tests ===
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_api_error_on_get(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test handling of Atlassian API error during the initial get_page_by_id call."""
@@ -491,7 +484,6 @@ async def test_update_page_api_error_on_get(mock_get_client, client: AsyncClient
 
     confluence_client_mock.get_page_by_id.assert_called_once_with(page_id=page_id, expand='body.storage,version,space')
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_api_error_on_update(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test handling of Atlassian API error during the update_page call."""
@@ -541,7 +533,6 @@ async def test_update_page_api_error_on_update(mock_get_client, client: AsyncCli
         representation="storage"
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client')
 async def test_update_page_unexpected_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test handling of an unexpected error during processing."""

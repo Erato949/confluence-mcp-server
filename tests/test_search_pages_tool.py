@@ -11,6 +11,8 @@ from .conftest import (
     confluence_client_mock        # Fixture for mocked Confluence client
 )
 
+pytestmark = pytest.mark.anyio
+
 # Basic test data
 MOCK_CQL_QUERY = "label = 'test-label' and type = page"
 MOCK_SEARCH_PAGE_1_ID = 701
@@ -22,7 +24,6 @@ MOCK_SEARCH_PAGE_2_TITLE = "Second Page for Testing Search"
 MOCK_SEARCH_PAGE_2_SPACE = "DOC"
 
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_success_basic(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful search_pages with a basic CQL query."""
@@ -106,7 +107,6 @@ async def test_search_pages_success_basic(mock_get_client, client: AsyncClient, 
         excerpt=None  # default
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_empty_results(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages when the CQL query yields no results."""
@@ -160,7 +160,6 @@ async def test_search_pages_empty_results(mock_get_client, client: AsyncClient, 
         excerpt=None
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages when the underlying logic function raises an HTTPException."""
@@ -203,7 +202,6 @@ async def test_search_pages_api_error(mock_get_client, client: AsyncClient, conf
         excerpt=None
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_invalid_cql_syntax(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages when the Confluence API reports an invalid CQL syntax."""
@@ -272,7 +270,6 @@ async def test_search_pages_invalid_cql_syntax(mock_get_client, client: AsyncCli
         ({"space_key_for_cql": None, "title_for_cql": "Title"}, (), "Value error, If 'cql' is not provided, both 'space_key_for_cql' and 'title_for_cql' must be provided.", "value_error"),
     ]
 )
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_invalid_input_types(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock, invalid_input: dict, expected_error_loc_suffix: tuple, expected_error_msg_part: str, expected_error_type: str):
     """Test search_pages with various invalid input data types."""
@@ -331,7 +328,6 @@ async def test_search_pages_invalid_input_types(mock_get_client, client: AsyncCl
 
 # === API Error Tests ===
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
 async def test_search_pages_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages when the underlying logic function raises an HTTPException."""
@@ -374,7 +370,6 @@ async def test_search_pages_api_error(mock_get_client, client: AsyncClient, conf
         excerpt=None
     )
 
-@pytest.mark.asyncio
 @patch('confluence_mcp_server.main.get_confluence_client') 
 async def test_search_pages_with_expand_and_excerpt(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages with 'expand' and 'excerpt' parameters."""
