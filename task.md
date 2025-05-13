@@ -142,16 +142,16 @@
         *   [x] Successful execution: filtering by both `filename` and `media_type` (conditional on API support).
     *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pyproject.toml` as it's internal to Starlette).
 *   **`add_attachment` Action:**
-    *   [x] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
-    *   [x] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
-    *   [x] Integrate `add_attachment` into `main.py`'s `execute_tool`
-    *   [x] Implement automated tests for `add_attachment` tool, covering:
-        *   [x] Successful execution: adding a new attachment to a page.
-        *   [x] Successful execution: adding an attachment with a comment.
-        *   [x] Successful execution: updating an existing attachment (new version).
-        *   [x] Error handling: page not found.
-        *   [x] Error handling: file data issues (e.g., empty, too large if there are limits).
-        *   [x] Error handling: invalid input types.
+    *   [ ] Define `add_attachment` input/output schema in `mcp_actions/schemas.py`
+    *   [ ] Implement `add_attachment_logic` function in `mcp_actions/attachment_actions.py`
+    *   [ ] Integrate `add_attachment` into `main.py`'s `execute_tool`
+    *   [ ] Implement automated tests for `add_attachment` tool, covering:
+        *   [ ] Successful execution: adding a new attachment to a page.
+        *   [ ] Successful execution: adding an attachment with a comment.
+        *   [ ] Successful execution: updating an existing attachment (new version).
+        *   [ ] Error handling: page not found.
+        *   [ ] Error handling: file data issues (e.g., empty, too large if there are limits).
+        *   [ ] Error handling: invalid input types.
 
 ## Phase 4: Testing, Refinement & Documentation
 *   [x] Set up GitHub repository and push initial project state.
