@@ -95,14 +95,14 @@
         *   [x] Error handling: page with the same title already exists in the space (if not allowed).
         *   [x] Error handling: invalid input types.
 *   **`delete_page` Action:**
-    *   [ ] Define `delete_page` input/output schema in `mcp_actions/schemas.py` (Input: `page_id`, Output: `message` or success bool)
-    *   [ ] Implement `delete_page_logic` function in `mcp_actions/page_actions.py`
-    *   [ ] Integrate `delete_page` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `delete_page` tool, covering:
-        *   [ ] Successful execution: deleting an existing page.
-        *   [ ] Error handling: page not found.
-        *   [ ] Error handling: insufficient permissions (if possible to simulate).
-        *   [ ] Error handling: invalid input types (e.g., non-string page_id).
+    *   [x] Define `delete_page` input/output schema in `mcp_actions/schemas.py` (Input: `page_id`, Output: `message` or success bool)
+    *   [x] Implement `delete_page_logic` function in `mcp_actions/page_actions.py`
+    *   [x] Integrate `delete_page` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `delete_page` tool, covering:
+        *   [x] Successful execution: deleting an existing page.
+        *   [x] Error handling: page not found.
+        *   [x] Error handling: insufficient permissions (if possible to simulate).
+        *   [x] Error handling: invalid input types (e.g., non-string page_id).
 *   **`get_comments` Action:**
     *   [x] Define `get_comments` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `get_comments_logic` function in `mcp_actions/comment_actions.py`

@@ -31,10 +31,12 @@ from .mcp_actions.schemas import (
     UpdatePageOutput, 
     GetCommentsInput, # Added for get_comments tool
     GetCommentsOutput, # Added for get_comments tool
+    DeletePageInput, # Added for delete_page tool
+    DeletePageOutput # Added for delete_page tool
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
-from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic, update_page_logic
+from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic, update_page_logic, delete_page_logic # Added delete_page_logic
 from .mcp_actions.comment_actions import get_comments_logic # Added for get_comments tool
 
 # Load environment variables from .env file
@@ -198,6 +200,14 @@ def load_tools():
         "input_schema": GetCommentsInput,
         "output_schema": GetCommentsOutput,
         "logic": get_comments_logic
+    }
+
+    # Delete Page Tool Definition
+    AVAILABLE_TOOLS['delete_page'] = {
+        "description": "Deletes a specific page by its ID.",
+        "input_schema": DeletePageInput,
+        "output_schema": DeletePageOutput,
+        "logic": delete_page_logic
     }
 
     print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")

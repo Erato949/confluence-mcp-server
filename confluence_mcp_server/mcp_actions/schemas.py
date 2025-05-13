@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, Field, model_validator, validator, constr
 
 class MCPToolSchema(BaseModel):
     """
@@ -291,13 +291,18 @@ class UpdatePageOutput(BaseModel):
 # --- Delete Page Schemas ---
 
 class DeletePageInput(BaseModel):
-    """Input schema for deleting a Confluence page."""
-    page_id: str = Field(..., description="The ID of the page to delete.")
+    """
+    Input schema for the delete_page tool.
+    Requires the ID of the page to be deleted.
+    """
+    page_id: constr(min_length=1) = Field(..., description="The ID of the Confluence page to delete.")
 
 class DeletePageOutput(BaseModel):
-    """Output schema after attempting to delete a Confluence page."""
-    success: bool = Field(..., description="Indicates whether the page deletion was successful.")
-    message: Optional[str] = Field(None, description="An optional message providing details about the deletion status.")
+    """
+    Output schema for the delete_page tool.
+    Confirms the successful deletion of the page.
+    """
+    message: str = Field(..., description="Confirmation message indicating the page was deleted.")
 
 
 # --- Get Comments Schemas ---

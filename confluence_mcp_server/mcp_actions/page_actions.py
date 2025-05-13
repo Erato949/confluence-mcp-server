@@ -515,7 +515,7 @@ async def update_page_logic(
 
             response_data = {
                 "page_id": str(updated_page_response.get("id", inputs.page_id)), # Schema wants str
-                "title": updated_page_response.get("title", current_title), # Fallback
+                "title": updated_page_response.get("title", current_title), # Use input title as fallback
                 "space_key": space_key,
                 "version": updated_page_response.get("version", {}).get("number", next_version_number),
                 "status": updated_page_response.get("status", "current"),
@@ -588,63 +588,44 @@ async def update_page_logic(
             detail=f"Internal Server Error: Unexpected error updating page. Details: {str(e)}"
         ) from e
 
-# Function to delete a page
-async def delete_page_logic(client: Confluence, inputs: DeletePageInput) -> DeletePageOutput:
-    """Handles the logic for deleting a Confluence page."""
+# --- Delete Page ---
+async def delete_page_logic(
+    client: Confluence,
+    inputs: DeletePageInput
+) -> DeletePageOutput:
+    """
+    Logic for the delete_page tool.
+    Deletes a specific page from Confluence by its ID.
+    """
     page_id = inputs.page_id
-    logger.info(f"Attempting to delete page with ID: {page_id}")
+    logger.debug(f"Attempting to delete page with ID: {page_id}")
 
     try:
-        # Attempt to delete the page using the provided page_id
-        # The delete_page method in atlassian-python-api doesn't return content on success,
-        # it usually returns None or raises ApiError.
-        client.delete_page(page_id=page_id)
+        # The atlassian-python-api's delete_page method typically returns True on success
+        # or raises ApiError on failure.
+        success = await client.delete_page(page_id=page_id, status=None, recursive=False) # Assuming we don't need recursive delete for now
 
-        logger.info(f"Successfully deleted page with ID: {page_id}")
-        return DeletePageOutput(
-            success=True,
-            message=f"Page with ID '{page_id}' deleted successfully."
-        )
+        if success: # Explicitly check return value if needed, though ApiError is the main indicator
+             logger.info(f"Successfully deleted page with ID: {page_id}")
+             return DeletePageOutput(message=f"Successfully deleted page with ID {page_id}.")
+        else:
+             # This path might be unlikely if ApiError is always raised on failure
+             logger.warning(f"delete_page call for ID {page_id} returned False/None but did not raise ApiError.")
+             raise HTTPException(status_code=500, detail=f"Failed to delete page ID {page_id}. API did not confirm success.")
 
     except ApiError as e:
-        # Log the specific API error
-        api_status_code = 500 # Default
-        if hasattr(e, 'response') and e.response is not None and hasattr(e.response, 'status_code') and e.response.status_code is not None:
-            api_status_code = e.response.status_code
-        elif hasattr(e, 'status_code') and e.status_code is not None:
-            api_status_code = e.status_code
-
-        api_reason = str(e)
-        logger.error(f"ERROR: API error during page deletion: {api_status_code} - {api_reason}")
-
-        # Determine HTTP status code for the response
-        http_status_code = 500 # Default for unexpected API errors
-        detail_message = f"Failed to delete page '{page_id}' due to an unexpected API error."
-
-        if api_status_code == 404:
-            http_status_code = 404
-            detail_message = f"Page with ID '{page_id}' not found."
-        elif api_status_code == 403:
-            http_status_code = 403
-            detail_message = f"Permission denied. Unable to delete page '{page_id}'. Check credentials/permissions."
-        elif isinstance(api_status_code, int) and 400 <= api_status_code < 500:
-             # Other 4xx client errors
-            http_status_code = api_status_code
-            detail_message = f"Failed to delete page '{page_id}'. API returned status {api_status_code}: {api_reason}"
-
-        # Re-raise as HTTPException
-        raise HTTPException(
-            status_code=http_status_code,
-            detail=detail_message
-        )
-
+        status_code = getattr(e, 'response', None) and getattr(e.response, 'status_code', 500)
+        error_message = str(e)
+        logger.error(f"Confluence API error deleting page ID {page_id}: Status {status_code} - {error_message}")
+        if status_code == 404:
+            raise HTTPException(status_code=404, detail=f"Page with ID {page_id} not found.")
+        elif status_code == 403:
+             raise HTTPException(status_code=403, detail=f"Permission denied when attempting to delete page ID {page_id}.")
+        else:
+            raise HTTPException(status_code=status_code, detail=f"Confluence API error deleting page ID {page_id}: {error_message}")
+            
+    except HTTPException: # Re-raise HTTPException if it was raised above
+        raise
     except Exception as e:
-        # Catch any other unexpected errors
-        logger.exception(f"Unexpected error deleting page '{page_id}': {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"An unexpected error occurred while attempting to delete page '{page_id}'."
-        )
-
-# --- Delete Page --- (Placeholder)
-# ...
+        logger.exception(f"Unexpected error deleting page ID {page_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while deleting page ID {page_id}: {str(e)}")
