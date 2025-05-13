@@ -1,15 +1,48 @@
 # confluence_mcp_server/mcp_actions/page_actions.py
 
 from atlassian import Confluence
-from atlassian.errors import ApiError # Try importing ApiError
-from .schemas import GetPageInput, GetPageOutput, SearchPagesInput, SearchedPageSchema, SearchPagesOutput, CreatePageInput, CreatePageOutput, UpdatePageInput, UpdatePageOutput
+from atlassian.errors import ApiError 
 from fastapi import HTTPException
-from typing import List, Dict, Any, Optional
+from pydantic import ValidationError 
+from typing import List, Optional
+from urllib.parse import urljoin 
+import asyncio
+import logging
 
-def get_page_logic(
+logger = logging.getLogger(__name__)
+
+from .schemas import (
+    GetPageInput, GetPageOutput,
+    SearchPagesInput, SearchPagesOutput, SearchedPageSchema,
+    CreatePageInput, CreatePageOutput,
+    UpdatePageInput, UpdatePageOutput,
+    # DeletePageInput, DeletePageOutput # Uncomment when implemented
+)
+
+# --- Helper Functions ---
+
+def get_confluence_page_url(webui_link: Optional[str], instance_base_url: str) -> str:
+    """Constructs the full web URL for a Confluence page using urljoin."""
+    if not webui_link:
+        logger.debug("webui_link not provided, returning URL_NOT_AVAILABLE")
+        return "URL_NOT_AVAILABLE"
+
+    # Ensure base URL ends with a slash for urljoin to work correctly with relative paths
+    if not instance_base_url.endswith('/'):
+        instance_base_url += '/'
+
+    # webui_link might be like '/wiki/display/...' or just '/display/...' or even relative
+    # urljoin handles combining these intelligently.
+    full_url = urljoin(instance_base_url, webui_link)
+
+    logger.debug(f"Constructed URL: base='{instance_base_url}', webui='{webui_link}', result='{full_url}'")
+    return full_url
+
+# --- Get Page ---
+async def get_page_logic(
     client: Confluence,
     inputs: GetPageInput
-) -> GetPageOutput:
+) -> GetPageOutput | None:
     """
     Logic for the Get_Page tool.
     Fetches a specific page from Confluence by its ID, or by its space key and title.
@@ -18,13 +51,13 @@ def get_page_logic(
     page_data = None
     error_detail_prefix = ""
     try:
-        print(f"DEBUG: get_page_logic called with inputs: page_id={inputs.page_id}, space_key={inputs.space_key}, title={inputs.title}, expand={inputs.expand}") # Debug line
+        logger.debug(f"get_page_logic called with inputs: page_id={inputs.page_id}, space_key={inputs.space_key}, title={inputs.title}, expand={inputs.expand}") # Debug line
         if inputs.page_id is not None:
-            print(f"Calling Confluence API get_page_by_id with page_id: {inputs.page_id}, expand: {inputs.expand}")
+            logger.debug(f"Calling Confluence API get_page_by_id with page_id: {inputs.page_id}, expand: {inputs.expand}")
             page_data = client.get_page_by_id(page_id=inputs.page_id, expand=inputs.expand)
             error_detail_prefix = f"Page with ID {inputs.page_id}"
         elif inputs.space_key and inputs.title:
-            print(f"Calling Confluence API get_page_by_title with space_key: {inputs.space_key}, title: {inputs.title}, expand: {inputs.expand}")
+            logger.debug(f"Calling Confluence API get_page_by_title with space_key: {inputs.space_key}, title: {inputs.title}, expand: {inputs.expand}")
             # Note: get_page_by_title does not directly support 'expand' in atlassian-python-api as of 4.0.3
             # We would typically fetch by title, get the ID, then fetch by ID with expand if needed.
             # For simplicity here, we'll assume get_page_by_title returns enough, or we handle expansion post-fetch if necessary.
@@ -34,10 +67,10 @@ def get_page_logic(
         # The GetPageInput model validator should prevent a state where neither condition is met.
 
         if not page_data:
-            print(f"DEBUG: page_data is None or empty after API call.") # Debug line
+            logger.debug(f"page_data is None or empty after API call.") # Debug line
             raise HTTPException(status_code=404, detail=f"{error_detail_prefix} not found.")
 
-        print(f"DEBUG: page_data received from API mock: {page_data}") # Debug line
+        logger.debug(f"page_data received from API mock: {page_data}") # Debug line
 
         # Extract space key - it might be directly available or nested if 'space' is expanded
         space_key_val = "UNKNOWN"
@@ -48,17 +81,17 @@ def get_page_logic(
         
         # Extract content if available (depends on expand='body.storage')
         content_val = None
-        print(f"DEBUG: Attempting to extract content. page_data.get('body'): {page_data.get('body')}") # Debug line
+        logger.debug(f"DEBUG: Attempting to extract content. page_data.get('body'): {page_data.get('body')}") # Debug line
         if 'body' in page_data and isinstance(page_data['body'], dict) and 'storage' in page_data['body'] and isinstance(page_data['body']['storage'], dict) and 'value' in page_data['body']['storage']:
             content_val = page_data['body']['storage']['value']
-        print(f"DEBUG: content_val after extraction: {content_val}") # Debug line
+        logger.debug(f"DEBUG: content_val after extraction: {content_val}") # Debug line
         
         # Extract version if available (depends on expand='version')
         version_val = None
-        print(f"DEBUG: Attempting to extract version. page_data.get('version'): {page_data.get('version')}") # Debug line
+        logger.debug(f"DEBUG: Attempting to extract version. page_data.get('version'): {page_data.get('version')}") # Debug line
         if 'version' in page_data and isinstance(page_data['version'], dict) and 'number' in page_data['version']:
             version_val = page_data['version']['number']
-        print(f"DEBUG: version_val after extraction: {version_val}") # Debug line
+        logger.debug(f"DEBUG: version_val after extraction: {version_val}") # Debug line
 
         # Construct web_url
         # The base URL needs to be from the client or config, as page_data._links.webui might be relative or absolute depending on API.
@@ -82,8 +115,8 @@ def get_page_logic(
         else:
             web_url_val = "URL_NOT_FOUND"
 
-        print(f"DEBUG: PRE-RETURN: page_id raw from page_data: {page_data.get('id')}, type: {type(page_data.get('id'))}") # Debug line
-        print(f"DEBUG: PRE-RETURN: title: {page_data.get('title')}, space_key: {space_key_val}, status: {page_data.get('status', 'unknown')}, content: {content_val}, version: {version_val}, web_url: {web_url_val}") # Debug line
+        logger.debug(f"PRE-RETURN: page_id raw from page_data: {page_data.get('id')}, type: {type(page_data.get('id'))}") # Debug line
+        logger.debug(f"PRE-RETURN: title: {page_data.get('title')}, space_key: {space_key_val}, status: {page_data.get('status', 'unknown')}, content: {content_val}, version: {version_val}, web_url: {web_url_val}") # Debug line
         
         output_object = GetPageOutput(
             page_id=page_data['id'],
@@ -94,18 +127,18 @@ def get_page_logic(
             version=version_val,
             web_url=web_url_val
         )
-        print(f"DEBUG: POST-INSTANTIATION of GetPageOutput: {output_object.model_dump_json(indent=2)}") # Debug line
+        logger.debug(f"POST-INSTANTIATION of GetPageOutput: {output_object.model_dump_json(indent=2)}") # Debug line
         return output_object
 
     except HTTPException: # Re-raise HTTPException to be caught by the endpoint handler
         raise
     except Exception as e:
-        print(f"!!!!!!!!!! FATAL ERROR IN get_page_logic !!!!!!!!!=") # Enhanced Debug line
-        print(f"!!!!!!!!!! TYPE: {type(e).__name__} !!!!!!!!!=") # Enhanced Debug line
-        print(f"!!!!!!!!!! ARGS: {e.args} !!!!!!!!!=") # Enhanced Debug line
+        logger.error(f"!!!!!!!!!! FATAL ERROR IN get_page_logic !!!!!!!!!=") # Enhanced Debug line
+        logger.error(f"!!!!!!!!!! TYPE: {type(e).__name__} !!!!!!!!!=") # Enhanced Debug line
+        logger.error(f"!!!!!!!!!! ARGS: {e.args} !!!!!!!!!=") # Enhanced Debug line
         import traceback
-        print(traceback.format_exc()) # Print full traceback
-        print(f"Error encountered in get_page_logic: {type(e).__name__} - {e}")
+        logger.error(traceback.format_exc()) # Print full traceback
+        logger.error(f"Error encountered in get_page_logic: {type(e).__name__} - {e}")
         # Determine lookup method for error message
         lookup_method_desc = ""
         if inputs.page_id is not None:
@@ -119,16 +152,15 @@ def get_page_logic(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching page using {lookup_method_desc}: {str(e)}")
 
 
-def search_pages_logic(
+async def search_pages_logic(
     client: Confluence,
     inputs: SearchPagesInput
 ) -> SearchPagesOutput:
     """
-    Logic for the search_pages tool.
-    Searches Confluence pages using CQL.
+    Logic to search for Confluence pages using CQL.
     """
     try:
-        print(f"DEBUG: search_pages_logic called with CQL: {inputs.cql}, limit: {inputs.limit}, start: {inputs.start}, expand: {inputs.expand}, excerpt: {inputs.excerpt}")
+        logger.debug(f"DEBUG: search_pages_logic called with CQL: {inputs.cql}, limit: {inputs.limit}, start: {inputs.start}, expand: {inputs.expand}, excerpt: {inputs.excerpt}")
 
         # The atlassian-python-api's cql method returns a dictionary that usually includes:
         # 'results': list of page objects
@@ -148,7 +180,7 @@ def search_pages_logic(
         )
 
         if not api_response or 'results' not in api_response:
-            print(f"DEBUG: CQL search for '{inputs.cql}' returned no results or unexpected response format.")
+            logger.debug(f"DEBUG: CQL search for '{inputs.cql}' returned no results or unexpected response format.")
             return SearchPagesOutput(
                 results=[],
                 count=0,
@@ -160,7 +192,7 @@ def search_pages_logic(
                 excerpt_used=inputs.excerpt
             )
 
-        print(f"DEBUG: api_response from Confluence: {api_response}")
+        logger.debug(f"DEBUG: api_response from Confluence: {api_response}")
 
         processed_results: List[SearchedPageSchema] = []
         base_url = client.url.split('/rest/api')[0]
@@ -225,7 +257,7 @@ def search_pages_logic(
             
             if page_id_val is None:
                 # If still no page ID, skip this result as it's unusable for SearchedPageSchema
-                print(f"DEBUG: Skipping result due to missing page ID. Raw data: {page_data}")
+                logger.debug(f"DEBUG: Skipping result due to missing page ID. Raw data: {page_data}")
                 continue
 
             processed_results.append(
@@ -259,100 +291,95 @@ def search_pages_logic(
     except Exception as e:
         error_type = type(e).__name__
         error_msg = f"Error during CQL search: {str(e)}"
-        print(f"An unexpected error occurred in search_pages_logic: {error_type} - {error_msg}")
+        logger.error(f"An unexpected error occurred in search_pages_logic: {error_type} - {error_msg}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"{error_type}: {error_msg}")
 
-def create_page_logic(
+async def create_page_logic(
     client: Confluence,
-    inputs: CreatePageInput,
-    base_url: str  # Base URL of the Confluence instance
-) -> CreatePageOutput:
+    inputs: CreatePageInput
+) -> CreatePageOutput | None:
     """
     Logic for the create_page tool.
     Creates a new page in Confluence.
     """
     try:
-        print(f"DEBUG: create_page_logic called with inputs: space_key='{inputs.space_key}', title='{inputs.title}', parent_page_id={inputs.parent_page_id}, content_length={len(inputs.content)}")
+        logger.debug(f"DEBUG: create_page_logic called with inputs: space_key={inputs.space_key}, title={inputs.title}, parent_page_id={inputs.parent_page_id}") # Debug start
 
-        # The atlassian-python-api's create_page expects parent_id as a string if provided.
-        parent_id_str = str(inputs.parent_page_id) if inputs.parent_page_id is not None else None
+        # Prepare parameters for the API call
+        params = {
+            "space": inputs.space_key,
+            "title": inputs.title,
+            "body": inputs.content, # Map schema 'content' to API 'body'
+            "representation": "storage", # Specify content format
+            "type": "page"
+        }
+        if inputs.parent_page_id is not None:
+            params["parent_id"] = str(inputs.parent_page_id) # API expects string ID for parent
 
-        created_page_data = client.create_page(
-            space=inputs.space_key,
-            title=inputs.title,
-            body=inputs.content,
-            parent_id=parent_id_str,
-            type='page',
-            representation='storage',
-            editor='v2' # Optional: specify editor version, v2 is common for storage format
-        )
+        logger.debug(f"DEBUG: Calling client.create_page with params: {params}")
+        created_page_response = client.create_page(**params)
+        logger.debug(f"DEBUG: client.create_page response: {created_page_response}")
 
-        if not created_page_data or 'id' not in created_page_data:
-            print(f"DEBUG: create_page API call did not return expected data or ID. Response: {created_page_data}")
-            raise HTTPException(status_code=500, detail="Confluence API did not return expected data after page creation.")
+        if not created_page_response:
+             logger.error(f"ERROR: client.create_page returned unexpected response: {created_page_response}")
+             raise HTTPException(status_code=500, detail="Failed to create page, unexpected empty response from Confluence API.")
 
-        print(f"DEBUG: Page created successfully. API response: {created_page_data}")
+        # Construct the output using the response data
+        page_id = int(created_page_response.get("id", 0)) # API returns string ID
+        if not page_id:
+             logger.error(f"ERROR: 'id' not found or invalid in create_page response: {created_page_response}")
+             raise HTTPException(status_code=500, detail="Failed to create page, missing 'id' in Confluence API response.")
 
-        page_id = int(created_page_data['id'])
-        title = created_page_data.get('title', inputs.title) # API should return title
-        version_info = created_page_data.get('version', {})
+        webui_link = created_page_response.get('_links', {}).get('webui')
+        page_url = get_confluence_page_url(webui_link, client.url) # Use helper function
+
+        # Ensure version is extracted correctly
+        version_info = created_page_response.get('version', {})
         version_number = version_info.get('number', 1) # Default to 1 if not present
-        status = created_page_data.get('status', 'current')
 
-        # Construct the web URL
-        # Example _links structure: {'webui': '/display/SPACEKEY/Page+Title', ...}
-        # or sometimes {'tinyui': '/x/shortlink', 'self': '...rest/api/content/id'}
-        web_ui_link_path = ""
-        if '_links' in created_page_data and 'webui' in created_page_data['_links']:
-            web_ui_link_path = created_page_data['_links']['webui']
-        
-        # Ensure base_url doesn't have a trailing slash if web_ui_link_path starts with one
-        if base_url.endswith('/') and web_ui_link_path.startswith('/'):
-            effective_base_url = base_url.rstrip('/')
-        else:
-            effective_base_url = base_url
-            
-        full_web_url = f"{effective_base_url}{web_ui_link_path}" if web_ui_link_path else f"{effective_base_url}/pages/viewpage.action?pageId={page_id}"
+        response_data = {
+            "page_id": page_id,
+            "title": created_page_response.get("title", inputs.title), # Use input title as fallback
+            "space_key": inputs.space_key, # Space key comes from input
+            "version": version_number,
+            "status": created_page_response.get("status", "current"), # Default if not present
+            "url": page_url
+        }
 
+        logger.debug(f"DEBUG: Returning CreatePageOutput: {response_data}")
+        return CreatePageOutput(**response_data)
 
-        return CreatePageOutput(
-            page_id=page_id,
-            title=title,
-            space_key=inputs.space_key, # The space key is from input, not typically in create_page response directly
-            version=version_number,
-            status=status,
-            url=full_web_url
+    except ApiError as e:
+        # Log the specific API error
+        api_status_code = e.response.status_code if e.response is not None else 500
+        api_reason = str(e)
+        logger.error(f"ERROR: API error during page creation: {api_status_code} - {api_reason}")
+        # Determine appropriate status code based on Confluence error if possible
+        status_code = 500 # Default to internal server error
+        if api_status_code == 400:
+            status_code = 400 # Bad Request (e.g., invalid parent_id, malformed body)
+        elif api_status_code == 403:
+            status_code = 403 # Forbidden (permissions)
+        elif api_status_code == 404:
+             status_code = 404 # Not Found (e.g., space_key not found)
+
+        # Re-raise as HTTPException for FastAPI to handle
+        raise HTTPException(
+            status_code=status_code,
+            detail=f"Error creating page in Confluence: Details: {api_reason}"
+        )
+    except Exception as e:
+        # Catch any other unexpected errors
+        detailed_error_msg = f"Unexpected error during page creation: {type(e).__name__} - {str(e)}"
+        logger.error(f"ERROR: {detailed_error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating page in Confluence: Details: {str(e)}"
         )
 
-    except HTTPException: # Re-raise HTTPException
-        raise
-    except Exception as e:
-        error_type = type(e).__name__
-        error_msg = f"Error during page creation: {str(e)}"
-        print(f"An unexpected error occurred in create_page_logic: {error_type} - {error_msg}")
-        import traceback
-        traceback.print_exc() # For server-side logging of the full error
-        # Provide a more user-friendly message if possible, or specific Confluence error details
-        # For example, check if 'e' has attributes like 'response' for REST API errors
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                confluence_error = e.response.json()
-                error_detail = confluence_error.get('message', str(e))
-                status_code = e.response.status_code
-                # Check for common Confluence errors
-                if "A page with this title already exists" in error_detail:
-                    status_code = 409 # Conflict
-                
-                print(f"Confluence API Error ({status_code}): {error_detail}")
-                raise HTTPException(status_code=status_code, detail=f"Confluence API Error: {error_detail}")
-            except ValueError: # If response is not JSON
-                pass # Fall through to generic error
-
-        raise HTTPException(status_code=500, detail=f"Server Error ({error_type}): {error_msg}")
-
-def update_page_logic(
+async def update_page_logic(
     client: Confluence,
     inputs: UpdatePageInput
 ) -> UpdatePageOutput:
@@ -361,127 +388,170 @@ def update_page_logic(
     Requires the current version number for optimistic concurrency control.
     At least one of title, content, or parent_page_id must be provided.
     """
-    print(f"DEBUG: update_page_logic called with page_id: {inputs.page_id}, title: {inputs.title is not None}, has_content: {inputs.content is not None}, parent_id: {inputs.parent_page_id}, version: {inputs.current_version_number}")
+    logger.debug(f"DEBUG: update_page_logic called with page_id: {inputs.page_id}, title: {inputs.title is not None}, has_content: {inputs.content is not None}, parent_id: {inputs.parent_page_id}, version: {inputs.current_version_number}")
 
     try:
-        # The atlassian-python-api's update_page or update_page_by_id 
-        # typically requires page_id, new_title, new_body, next_version_number, 
-        # and potentially parent_id if moving.
-        # It might not directly support changing parent_id in the same call as content/title updates.
-        # For now, let's assume we handle title and content updates.
-        # Moving a page (changing parent_id) might need a separate API call or a different client method.
-        # Let's simplify and focus on title and content for now, and research parent_id update separately if needed.
-
-        # The Confluence API expects the *next* version number when updating.
-        next_version_number = inputs.current_version_number + 1
-
         # Initialize with input values or None
         current_title = inputs.title
         current_body = inputs.content
-        
-        # Fetch current page details only if needed to fill missing title/content
+        fetched_space_key = None # Store space key if we fetch the page
+
+        # Fetch current page details if title or content is missing for the update.
+        # Always expand 'space' to potentially get the space_key needed later.
+        expand_needed = "body.storage,version,space"
+
         if inputs.title is None or inputs.content is None:
-            print(f"DEBUG: Fetching current page {inputs.page_id} to get existing title/content for update.") # Keep DEBUG
+            logger.debug(f"DEBUG: Fetching current page {inputs.page_id} with expand='{expand_needed}' for update.")
             try:
-                current_page_data = client.get_page_by_id(page_id=inputs.page_id, expand="body.storage,version,space")
+                # Wrap synchronous call
+                current_page_data = await asyncio.to_thread(
+                    client.get_page_by_id, page_id=inputs.page_id, expand=expand_needed
+                )
+                logger.debug(f"DEBUG: Fetched current page data: {current_page_data}")
                 if inputs.title is None:
-                    # Use .get for safer access in case 'title' key is missing
                     current_title = current_page_data.get('title')
                 if inputs.content is None:
-                    # Use .get for nested access, defaulting to empty string if any part is missing
                     current_body = current_page_data.get('body', {}).get('storage', {}).get('value', '')
-                    if current_body == '':
-                         print(f"WARNING: Could not fetch existing body for page {inputs.page_id}, or body was empty. Proceeding with empty content.")
+                    if not current_body:
+                         logger.warning(f"Could not fetch existing body for page {inputs.page_id}, or body was empty. Proceeding with empty/provided content.")
 
+                # Store fetched space key if available
+                if 'space' in current_page_data and isinstance(current_page_data['space'], dict):
+                    fetched_space_key = current_page_data['space'].get('key')
+                    logger.debug(f"DEBUG: Fetched space_key='{fetched_space_key}' during initial get_page_by_id.")
+
+            except ApiError as e:
+                 # Fix ApiError handling (status code and reason)
+                 api_status_code = e.response.status_code if e.response is not None else 500
+                 api_reason = str(e)
+                 logger.error(f"ERROR: API error fetching page {inputs.page_id} for update: {api_status_code} - {api_reason}")
+                 if api_status_code == 404:
+                      raise HTTPException(status_code=404, detail=f"Page with ID {inputs.page_id} not found.") from e
+                 else:
+                      # Use api_reason for detail
+                      raise HTTPException(status_code=api_status_code, detail=f"Failed to fetch page {inputs.page_id} for update: {api_reason}") from e
             except Exception as e:
-                print(f"ERROR: Failed to fetch page {inputs.page_id} for update: {e}")
-                # Depending on desired behavior, could re-raise or return error here
-                # For now, if fetch fails, we proceed with potentially None title/body, which might fail at client.update_page
-                # or Pydantic might have already caught issues if inputs were insufficient.
-                # This path is tricky; ideally, if page_id is valid, fetch should work.
-                # If page_id is invalid, get_page_by_id would raise, handled by outer try-except.
-                pass # Or handle more gracefully
+                logger.error(f"ERROR: Unexpected error fetching page {inputs.page_id} for update: {e}")
+                raise HTTPException(status_code=500, detail=f"Unexpected error fetching page {inputs.page_id} for update: {str(e)}") from e
+
+        # Ensure we have a title before proceeding (check after potential fetch)
+        if current_title is None:
+             # This should only happen if fetch failed AND title wasn't provided.
+             raise HTTPException(status_code=400, detail="Title is required for update and could not be fetched or wasn't provided.")
+        # Body can be None or empty string if not provided and fetch failed/returned no body.
+        # client.update_page might require it, ensure representation is set if body is string.
 
         # Prepare parameters for the API call
+        next_version_number = inputs.current_version_number + 1
         update_params = {
             "page_id": inputs.page_id,
-            "title": current_title,
-            "body": current_body,
+            "title": current_title, # Use fetched or provided title
+            "body": current_body,   # Use fetched or provided content (can be None or str)
             "version": next_version_number,
+            # "representation": "storage" # Add this ONLY if body is a string
         }
 
-        # If 'body' is provided (even as an empty string), 'representation' is required.
+        # Conditionally add representation if body is a string (even empty)
         if isinstance(update_params.get("body"), str):
             update_params["representation"] = "storage"
+        else:
+            # If body is None (wasn't provided, couldn't be fetched), remove it from params
+            # as sending 'body: null' might be invalid depending on the API client library.
+            update_params.pop("body", None)
+            logger.debug(f"DEBUG: 'body' is None, removing from update_params.")
 
-        if inputs.parent_page_id:
-            update_params['parent_id'] = inputs.parent_page_id
-        
-        # Ensure title is not None
-        if update_params.get("title") is None:
-            raise HTTPException(status_code=500, detail=f"Internal error or failed to fetch page details: title is None before calling update_page for page {inputs.page_id}.")
-        
-        # Ensure body is not None (our logic defaults to "" if not found/provided for update)
-        if update_params.get("body") is None: 
-            raise HTTPException(status_code=500, detail=f"Internal error: body is None before calling update_page for page {inputs.page_id}. This should not happen.")
-
-        # Forcefully add representation if body is a string, right before the call
-        if isinstance(update_params.get("body"), str):
-            update_params["representation"] = "storage"
-        
-        print(f"DEBUG: update_params JUST BEFORE client.update_page call: {update_params}")
-
-        print(f"DEBUG: Calling client.update_page with params: {update_params}")
-        updated_page_response = client.update_page(**update_params)
-        print(f"DEBUG: client.update_page response: {updated_page_response}")
+        # OMIT parent_id from update_params - changing parent requires move_page.
+        logger.debug(f"DEBUG: Calling client.update_page via asyncio.to_thread with params: page_id={update_params.get('page_id')}, title='{update_params.get('title')}', body_present={update_params.get('body') is not None}, version={update_params.get('version')}, representation={update_params.get('representation')}")
+        # Wrap synchronous call
+        updated_page_response = await asyncio.to_thread(
+            client.update_page, **update_params
+        )
+        logger.debug(f"DEBUG: client.update_page response: {updated_page_response}")
 
         # Construct the output
-        page_url = get_confluence_page_url(updated_page_response.get('_links', {}).get('webui'), client.url)
-        
-        # The space key might not be directly in update_page response, might need to get it from page_id or existing context if necessary.
-        # Or it might be in _expandable -> space or similar. For now, assume we can get it or it's part of the response.
-        # If not, we might need another client.get_page_by_id call post-update, or pass it through if known.
-        # Let's assume updated_page_data contains enough info or we simplify for now.
-        # Often, the response to an update includes the full representation of the updated resource.
-        space_key = "UNKNOWN" # Placeholder, needs to be correctly sourced
-        if 'space' in updated_page_response and isinstance(updated_page_response['space'], dict) and 'key' in updated_page_response['space']:
-            space_key = updated_page_response['space']['key']
-        elif isinstance(updated_page_response.get('spaceKey'), str):
-             space_key = updated_page_response['spaceKey']
-        else: # Fallback: try to get page details again if spaceKey is missing
-            print(f"DEBUG: Space key not in update response, fetching page {inputs.page_id} for details.")
-            page_details_for_space = client.get_page_by_id(inputs.page_id, expand='space')
-            if 'space' in page_details_for_space and 'key' in page_details_for_space['space']:
-                space_key = page_details_for_space['space']['key']
+        try:
+            # Ensure base URL ends with '/' and webui path doesn't start with '/'
+            base_url = str(client.url).rstrip('/') + '/' # Ensure base ends with /
+            webui_path = updated_page_response.get('_links', {}).get('webui', '').lstrip('/') # Ensure path doesn't start with /
+            full_url = urljoin(base_url, webui_path)
+            logger.debug(f"Constructed URL: base='{base_url}', webui='{webui_path}', result='{full_url}'") # Log adjusted parts
 
-        response_data = {
-            "page_id": str(updated_page_response["id"]),
-            "title": updated_page_response["title"],
-            "space_key": space_key,
-            "version": updated_page_response["version"]["number"],
-            "status": updated_page_response.get("status", "current"), # Default if not present
-            "url": page_url
-        }
-        return UpdatePageOutput(**response_data)
+            # Get space_key (prefer from update_result, fallback to initial fetch if needed)
+            space_key = updated_page_response.get('space', {}).get('key')
+            if not space_key:
+                space_key = fetched_space_key
+                logger.debug(f"DEBUG: Using space_key='{space_key}' fetched earlier.")
+
+            if not space_key:
+                logger.error(f"ERROR: Could not determine space_key for updated page {inputs.page_id}. Response: {updated_page_response}")
+                raise HTTPException(status_code=500, detail=f"Internal error: Could not determine space key for page {inputs.page_id} after update.")
+
+            response_data = {
+                "page_id": str(updated_page_response.get("id", inputs.page_id)), # Schema wants str
+                "title": updated_page_response.get("title", current_title), # Fallback
+                "space_key": space_key,
+                "version": updated_page_response.get("version", {}).get("number", next_version_number),
+                "status": updated_page_response.get("status", "current"),
+                "url": full_url
+            }
+
+            # Validate final output structure before returning
+            try:
+                 output = UpdatePageOutput(**response_data)
+                 logger.debug(f"DEBUG: Successfully created UpdatePageOutput: {output.model_dump()}")
+                 return output
+            except ValidationError as val_err:
+                 error_details = val_err.errors()
+                 logger.error(f"ERROR: ValidationError creating UpdatePageOutput. Data: {response_data}. Details: {error_details}")
+                 # Provide more detail in the HTTPException if possible
+                 detail_msg = f"Internal Server Error: Failed to structure update page response. First error: {error_details[0]['msg']} at loc {error_details[0]['loc']}"
+                 raise HTTPException(status_code=500, detail=detail_msg) from val_err
+
+        except ApiError as e:
+            # Correctly access status code directly from ApiError
+            api_status_code = e.response.status_code if e.response is not None else 500
+            api_reason = str(e)
+            logger.error(f"API error during page update for page_id {inputs.page_id}: Status {api_status_code}, Reason: {api_reason}")
+            raise HTTPException(status_code=api_status_code, detail=f"Error interacting with Confluence API: {api_reason}")
+        except Exception as e:
+            # Handle unexpected errors
+            logger.error(f"Unexpected error during page update for page_id {inputs.page_id}: {type(e).__name__} - {str(e)}", exc_info=True)
+            # Match the error message format expected in the passed test test_update_page_unexpected_error
+            raise HTTPException(status_code=500, detail=f"Unexpected error updating page. Details: {str(e)}")
+
+    except ApiError as e:
+        # Fix ApiError handling (status code and reason)
+        api_status_code = e.response.status_code if e.response is not None else 500
+        api_reason = str(e)
+        logger.error(f"ERROR: Confluence API error during page update: {api_status_code} - {api_reason}")
+        # Determine appropriate status code based on Confluence error if possible
+        status_code = 500 # Default to internal server error
+        if api_status_code == 400:
+            status_code = 400 # Bad Request (e.g., invalid parent_id, malformed body)
+        elif api_status_code == 403:
+            status_code = 403 # Forbidden (permissions)
+        elif api_status_code == 404:
+             status_code = 404 # Not Found (e.g., space_key not found)
+        elif api_status_code == 409:
+            status_code = 409 # Conflict updating page (e.g., incorrect current_version_number)
+
+        logger.error(f"ERROR: Confluence API error during page update: {api_status_code} - {api_reason}")
+        raise HTTPException(status_code=status_code, detail=f"Error updating page in Confluence: Details: {api_reason}") from e
+
+    except HTTPException as http_exc: # Re-raise HTTPExceptions raised internally
+         logger.debug(f"DEBUG: Re-raising HTTPException from update_page_logic: {http_exc.status_code} - {http_exc.detail}")
+         raise http_exc
 
     except Exception as e:
-        detailed_error_msg = f"Error during page update for page_id {inputs.page_id}: {type(e).__name__} - {str(e)}"
-        print(f"An unexpected error occurred in update_page_logic: {detailed_error_msg}") 
+        # Catch any other unexpected errors
+        detailed_error_msg = f"Unexpected error during page update for page_id {inputs.page_id}: {type(e).__name__} - {str(e)}"
+        logger.error(f"ERROR: {detailed_error_msg}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=500, 
-            detail=f"Error updating page in Confluence: Details: {str(e)}"
-        )
+            status_code=500,
+            detail=f"Internal Server Error: Unexpected error updating page. Details: {str(e)}"
+        ) from e
 
-# Placeholder for get_confluence_page_url if it's not globally available in this file
-def get_confluence_page_url(webui_link: Optional[str], instance_base_url: str) -> str:
-    if webui_link:
-        # webui_link is usually like "/wiki/spaces/SPACEKEY/pages/PAGEID/Page+Title"
-        # or just "/spaces/SPACEKEY/pages/PAGEID/Page+Title"
-        # We need to ensure it becomes a full URL.
-        # Remove leading "/wiki" if instance_base_url already contains it or if it's not standard
-        if instance_base_url.endswith("/wiki") and webui_link.startswith("/wiki"):
-            webui_link = webui_link[len("/wiki"):]
-        elif not instance_base_url.endswith("/") and not webui_link.startswith("/"):
-            webui_link = "/" + webui_link
-        return f"{instance_base_url.rstrip('/')}{webui_link}"
-    return "URL_NOT_AVAILABLE"
+# --- Delete Page --- (Placeholder)
+# ...

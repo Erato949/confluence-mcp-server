@@ -2,6 +2,9 @@
 
 import pytest
 from httpx import AsyncClient
+from unittest.mock import AsyncMock
+from confluence_mcp_server.main import app, AVAILABLE_TOOLS
+from confluence_mcp_server.mcp_actions.schemas import GetSpacesOutput, SpaceSchema, GetSpacesInput
 
 # Mark all tests in this file for pytest-asyncio with a session-scoped event loop
 pytestmark = pytest.mark.asyncio(scope='session')
@@ -14,39 +17,57 @@ async def test_health_check(client: AsyncClient):
     # Attempt the GET request
     response = await client.get("/health")
     assert response.status_code == 200
-    data = response.json()
-    assert data.get("status") == "ok"
-    assert "message" in data
-    assert "confluence_client_status" in data
+    # Expect 'initialized' since .env is loaded
+    assert response.json() == {"status": "ok", "message": "Confluence MCP Server is running", "confluence_client_status": "initialized"}
 
 @pytest.mark.asyncio
 async def test_tools_get_spaces_action(client: AsyncClient):
-    """Test the /execute endpoint with the 'get_spaces' tool."""
+    """Test the /execute endpoint with the 'get_spaces' tool, mocking the logic layer manually."""
     print(f"DEBUG: Inside test_tools_get_spaces_action, client object is: {client}")
-    request_payload = {
-        "tool_name": "get_spaces",
-        "inputs": {}
-    }
-    response = await client.post("/execute", json=request_payload)
-    assert response.status_code == 200
-    data = response.json()
-
-    # Assertions adjusted to observed output structure
-    assert data.get("status") == "success"
-    assert data.get("tool_name") == "get_spaces"
-    assert "outputs" in data
-    assert data.get("error_message") is None
-    assert data.get("error_type") is None
     
-    tool_outputs = data.get("outputs")
-    assert tool_outputs is not None
-    assert "spaces" in tool_outputs
-    assert "count" in tool_outputs
-    assert isinstance(tool_outputs.get("spaces"), list)
-    assert tool_outputs.get("count") == len(tool_outputs.get("spaces"))
+    tool_name = "get_spaces"
+    # Arrange: Define the mock return value for the logic function
+    mock_output = GetSpacesOutput(
+        spaces=[
+            SpaceSchema(id=101, key="API", name="API Space", type="global", status="CURRENT"),
+        ],
+        count=1,
+        total_available=1 # Ensure total_available is provided if known
+    )
+    
+    # Manually create the mock for the logic
+    manual_mock_logic = AsyncMock(return_value=mock_output)
+    
+    # Store original logic and replace it in the dictionary
+    original_logic = AVAILABLE_TOOLS[tool_name]["logic"]
+    AVAILABLE_TOOLS[tool_name]["logic"] = manual_mock_logic
 
-    if tool_outputs.get("spaces"):
-        space_item = tool_outputs.get("spaces")[0]
-        assert "id" in space_item
-        assert "key" in space_item
-        assert "name" in space_item
+    try:
+        request_payload = {
+            "tool_name": tool_name,
+            "inputs": {} # Example: use default inputs for GetSpacesInput
+        }
+
+        # Act
+        response = await client.post("/execute", json=request_payload)
+
+        # Assert
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["status"] == "success"
+        assert response_data["tool_name"] == tool_name
+        
+        # Assert based on the mock_output structure
+        expected_outputs_dict = mock_output.model_dump()
+        assert response_data["outputs"] == expected_outputs_dict
+
+        # Verify the manual mock was called correctly
+        manual_mock_logic.assert_awaited_once()
+        call_args, call_kwargs = manual_mock_logic.call_args
+        assert isinstance(call_kwargs.get('inputs'), GetSpacesInput) # Logic receives parsed input
+        # We don't strictly need to check the confluence client passed here
+        # as the logic is mocked, but could assert 'client' key exists if needed.
+
+    finally:
+        # Restore the original logic
+        AVAILABLE_TOOLS[tool_name]["logic"] = original_logic

@@ -5,7 +5,7 @@ from atlassian import Confluence
 from atlassian.errors import ApiError
 from .schemas import GetSpacesInput, GetSpacesOutput, SpaceSchema
 
-def get_spaces_logic(
+async def get_spaces_logic(
     client: Confluence,
     inputs: GetSpacesInput
 ) -> GetSpacesOutput:
@@ -99,7 +99,13 @@ def get_spaces_logic(
         print(f"Calling Confluence API get_all_spaces with params: {api_params_for_fetch}")
         raw_spaces_data = client.get_all_spaces(**api_params_for_fetch)
 
+        # Initialize total_available for this scenario
+        total_spaces_available = None
+
         if raw_spaces_data and 'results' in raw_spaces_data:
+            # Extract total available count from 'size' field if present
+            total_spaces_available = raw_spaces_data.get('size')
+
             for space_data_item in raw_spaces_data['results']:
                 # Robustness: Check for essential keys before creating SpaceSchema
                 required_keys = ['id', 'key', 'name', 'type']
@@ -120,14 +126,15 @@ def get_spaces_logic(
                     )
                 )
         
-        # 'size' in the API response indicates the number of items in the current page/batch
-        num_retrieved_this_call = raw_spaces_data.get('size', len(processed_spaces)) if raw_spaces_data else len(processed_spaces)
-
-        return GetSpacesOutput(
-            spaces=processed_spaces,
-            count=len(processed_spaces),
-            total_available=num_retrieved_this_call 
-        )
+            return GetSpacesOutput(
+                spaces=processed_spaces,
+                count=len(processed_spaces),
+                total_available=total_spaces_available # Use extracted size
+            )
+        else:
+            # Handle empty response or unexpected format
+            print(f"Warning: get_all_spaces returned no results or unexpected format: {raw_spaces_data}")
+            return GetSpacesOutput(spaces=[], count=0, total_available=0) # Assuming 0 if no results
 
     except Exception as e:
         print(f"Error encountered in get_spaces_logic: {type(e).__name__} - {e}")

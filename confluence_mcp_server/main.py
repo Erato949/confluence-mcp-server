@@ -5,6 +5,12 @@ from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional, Union
 from atlassian import Confluence
 from pydantic import ValidationError
+from pydantic_core import ErrorDetails
+import json
+import logging
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Import schemas from the mcp_actions package
 from .mcp_actions.schemas import (
@@ -96,7 +102,7 @@ app = FastAPI(
 )
 
 # --- In-memory store for tool definitions ---
-AVAILABLE_TOOLS: Dict[str, MCPToolSchema] = {}
+AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {}
 
 # --- Helper function to load tool definitions ---
 def load_tools():
@@ -104,49 +110,46 @@ def load_tools():
     Loads and registers tool definitions.
     """
     # Define and register the get_spaces tool
-    get_spaces_tool_definition = MCPToolSchema(
-        name="get_spaces",
-        description="Retrieves a list of spaces from Confluence. Allows optional filtering by space type, and pagination using limit and start.",
-        input_schema=GetSpacesInput.model_json_schema(),  
-        output_schema=GetSpacesOutput.model_json_schema() 
-    )
-    AVAILABLE_TOOLS[get_spaces_tool_definition.name] = get_spaces_tool_definition
+    AVAILABLE_TOOLS['get_spaces'] = {
+        "description": "Retrieves a list of spaces from Confluence. Allows optional filtering by space type, and pagination using limit and start.",
+        "input_schema": GetSpacesInput,
+        "output_schema": GetSpacesOutput,
+        "logic": get_spaces_logic
+    }
 
-    # Define and register the Get_Page tool
-    get_page_tool_definition = MCPToolSchema(
-        name="Get_Page", 
-        description="Retrieves a specific page from Confluence by its ID. Allows optional expansion of page details like content and version.",
-        input_schema=GetPageInput.model_json_schema(),
-        output_schema=GetPageOutput.model_json_schema()
-    )
-    AVAILABLE_TOOLS[get_page_tool_definition.name] = get_page_tool_definition
+    # Get Page Tool Definition
+    AVAILABLE_TOOLS['Get_Page'] = {
+        "description": "Fetches a specific page by ID or by space key and title.",
+        "input_schema": GetPageInput,
+        "output_schema": GetPageOutput,
+        "logic": get_page_logic  # Reference the logic function
+    }
 
-    # Define and register the search_pages tool
-    search_pages_tool_definition = MCPToolSchema(
-        name="search_pages",
-        description="Searches for Confluence pages using Confluence Query Language (CQL). Allows for pagination, expanding content, and highlighting excerpts.",
-        input_schema=SearchPagesInput.model_json_schema(),
-        output_schema=SearchPagesOutput.model_json_schema()
-    )
-    AVAILABLE_TOOLS[search_pages_tool_definition.name] = search_pages_tool_definition
+    # Search Pages Tool Definition
+    AVAILABLE_TOOLS['search_pages'] = {
+        "description": "Searches for pages using Confluence Query Language (CQL) or basic filters.",
+        "input_schema": SearchPagesInput,
+        "output_schema": SearchPagesOutput,
+        "logic": search_pages_logic
+    }
+    
+    # Create Page Tool Definition
+    AVAILABLE_TOOLS['create_page'] = {
+        "description": "Creates a new page in a Confluence space.",
+        "input_schema": CreatePageInput,
+        "output_schema": CreatePageOutput,
+        "logic": create_page_logic
+    }
 
-    # Define and register the create_page tool
-    create_page_tool_definition = MCPToolSchema(
-        name="create_page",
-        description="Create a new page in Confluence.",
-        input_schema=CreatePageInput.model_json_schema(),
-        output_schema=CreatePageOutput.model_json_schema()
-    )
-    AVAILABLE_TOOLS[create_page_tool_definition.name] = create_page_tool_definition
+    # Update Page Tool Definition
+    AVAILABLE_TOOLS['update_page'] = {
+        "description": "Updates an existing page's title, content, or parent.",
+        "input_schema": UpdatePageInput,
+        "output_schema": UpdatePageOutput,
+        "logic": update_page_logic
+    }
 
-    # Define and register the update_page tool
-    update_page_tool_definition = MCPToolSchema(
-        name="update_page",
-        description="Update an existing page in Confluence (title, content, or parent). Requires current page version for optimistic locking.",
-        input_schema=UpdatePageInput.model_json_schema(),
-        output_schema=UpdatePageOutput.model_json_schema()
-    )
-    AVAILABLE_TOOLS[update_page_tool_definition.name] = update_page_tool_definition
+    print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")
 
 # Call load_tools at startup to populate AVAILABLE_TOOLS
 load_tools()
@@ -160,275 +163,115 @@ async def health_check():
     client_status = "initialized" if confluence_client else "not_initialized"
     return {"status": "ok", "message": "Confluence MCP Server is running", "confluence_client_status": client_status}
 
+def make_errors_json_serializable(errors: list[ErrorDetails]) -> list[dict]:
+    """Converts Pydantic's ErrorDetails list into a JSON-serializable format.
+
+    Handles non-serializable types often found in validation contexts,
+    like exception objects or complex inputs, by converting them to strings.
+    """
+    serializable_list = []
+    if not isinstance(errors, list):
+        # Handle cases where errors might not be a list as expected
+        return [{'msg': 'Invalid error format received.'}]
+        
+    for error in errors:
+        # Ensure error is a dictionary before processing
+        if not isinstance(error, dict):
+            serializable_list.append({'msg': f'Non-dict error item encountered: {type(error)}'})
+            continue
+            
+        serializable_error = {} 
+        for key, value in error.items():
+            try:
+                # Attempt a simple JSON check - this is basic but covers common cases
+                json.dumps({key: value})
+                serializable_error[key] = value
+            except (TypeError, OverflowError):
+                # If standard serialization fails, convert to string
+                # Special handling for 'loc' which should be a tuple of strings/ints
+                if key == 'loc' and isinstance(value, (list, tuple)):
+                     serializable_error[key] = tuple(str(loc_item) for loc_item in value)
+                # Convert anything else problematic to its string representation
+                else:
+                    serializable_error[key] = str(value)
+                    
+        serializable_list.append(serializable_error)
+    return serializable_list
+
 @router.post("/execute", response_model=MCPExecuteResponse, response_model_exclude_none=True)
 async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
-    client: Confluence
     tool_name = request.tool_name
     inputs = request.inputs or {}
+    tool_info = AVAILABLE_TOOLS.get(tool_name)
 
-    if tool_name not in AVAILABLE_TOOLS:
+    if not tool_info:
         error_payload = MCPExecuteResponse(
             tool_name=tool_name,
             status="error",
             error_message=f"Tool '{tool_name}' is not recognized or not available.",
             error_type="ToolNotFoundError"
-        ).model_dump(exclude_none=True)
+        ).model_dump(exclude_none=False)
         return JSONResponse(content=error_payload, status_code=404)
 
-    try:
-        client = get_confluence_client()
+    logic_function = tool_info.get('logic')
+    input_schema_class = tool_info.get('input_schema')
 
-        if tool_name == "get_spaces":
-            try:
-                parsed_inputs = GetSpacesInput(**inputs)
-            except ValidationError as e:
-                serializable_errors = []
-                for error_detail in e.errors():
-                    if error_detail.get('type') == 'value_error' and not isinstance(error_detail.get('msg'), str):
-                        error_detail['msg'] = str(error_detail.get('msg', ''))
-                    serializable_errors.append(error_detail)
-
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message="Input validation failed.",
-                    validation_details=serializable_errors
-                )
-                return JSONResponse(content=error_payload.model_dump(), status_code=422)
-
-            tool_output_model = get_spaces_logic(client=client, inputs=parsed_inputs)
-            response_object = MCPExecuteResponse(
-                tool_name=tool_name,
-                status="success",
-                outputs=tool_output_model.model_dump(exclude_none=True) # Ensure dict and exclude Nones
-            )
-            print(f"DEBUG MAIN: Returning MCPExecuteResponse object directly for get_spaces. Model before FastAPI processing: {response_object.model_dump_json(indent=2, exclude_none=False)}")
-            return response_object
-        
-        elif tool_name == "Get_Page": 
-            try:
-                parsed_inputs = GetPageInput(**inputs)
-            except ValidationError as e:
-                serializable_errors = []
-                for error_detail in e.errors():
-                    if error_detail.get('type') == 'value_error' and not isinstance(error_detail.get('msg'), str):
-                        error_detail['msg'] = str(error_detail.get('msg', ''))
-                    serializable_errors.append(error_detail)
-
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message="Input validation failed.",
-                    validation_details=serializable_errors
-                )
-                return JSONResponse(content=error_payload.model_dump(), status_code=422)
-            
-            try:
-                tool_output_model = get_page_logic(client=client, inputs=parsed_inputs)
-                response_object = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="success",
-                    outputs=tool_output_model.model_dump(exclude_none=False) # Keep exclude_none=False as per original intent for Get_Page
-                )
-                print(f"DEBUG MAIN: Returning MCPExecuteResponse object directly for Get_Page. Model before FastAPI processing: {response_object.model_dump_json(indent=2, exclude_none=False)}")
-                return response_object
-            except HTTPException as http_exc: 
-                print(f"DEBUG MAIN: HTTPException caught for Get_Page: {http_exc.status_code} - {http_exc.detail}")
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=str(http_exc.detail),
-                    error_type=type(http_exc).__name__ 
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-            except Exception as e: 
-                print(f"DEBUG MAIN: Generic Exception caught for Get_Page: {type(e).__name__} - {str(e)}")
-                import traceback
-                print(traceback.format_exc())
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
-                    error_type="ToolLogicError"
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=500)
-
-        elif tool_name == "search_pages": 
-            try:
-                parsed_inputs = SearchPagesInput(**inputs)
-            except ValidationError as e:
-                serializable_errors = []
-                for error_detail in e.errors():
-                    if error_detail.get('type') == 'value_error' and not isinstance(error_detail.get('msg'), str):
-                        error_detail['msg'] = str(error_detail.get('msg', ''))
-                    serializable_errors.append(error_detail)
-
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message="Input validation failed.",
-                    validation_details=serializable_errors
-                )
-                return JSONResponse(content=error_payload.model_dump(), status_code=422)
-            
-            try:
-                tool_output_model = search_pages_logic(client=client, inputs=parsed_inputs)
-                response_object = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="success",
-                    outputs=tool_output_model.model_dump(exclude_none=True) 
-                )
-                # print(f"DEBUG MAIN: Returning MCPExecuteResponse object for search_pages. Model: {response_object.model_dump_json(indent=2, exclude_none=True)}")
-                return response_object
-            except HTTPException as http_exc: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=str(http_exc.detail),
-                    error_type=type(http_exc).__name__ 
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-            except Exception as e: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
-                    error_type="ToolLogicError"
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=500)
-
-        elif tool_name == "create_page":
-            try:
-                parsed_inputs = CreatePageInput(**request.inputs)
-            except ValidationError as e:
-                serializable_errors = []
-                for error_detail in e.errors():
-                    if error_detail.get('type') == 'value_error' and not isinstance(error_detail.get('msg'), str):
-                        error_detail['msg'] = str(error_detail.get('msg', ''))
-                    serializable_errors.append(error_detail)
-
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message="Input validation failed.",
-                    validation_details=serializable_errors
-                )
-                return JSONResponse(content=error_payload.model_dump(), status_code=422)
-            
-            try:
-                # Ensure CONFLUENCE_URL (base_url for link construction) is available
-                if not CONFLUENCE_URL:
-                    raise HTTPException(status_code=503, detail="CONFLUENCE_URL is not configured on the server, cannot construct page URL.")
-                
-                tool_output_model = create_page_logic(client=client, inputs=parsed_inputs, base_url=CONFLUENCE_URL)
-                response_object = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="success",
-                    outputs=tool_output_model.model_dump(exclude_none=True) 
-                )
-                return response_object
-            except HTTPException as http_exc: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=str(http_exc.detail),
-                    error_type=type(http_exc).__name__ 
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-            except Exception as e: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
-                    error_type="ToolLogicError"
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=500)
-
-        elif tool_name == "update_page":
-            try:
-                parsed_inputs = UpdatePageInput(**request.inputs)
-            except ValidationError as e:
-                # Helper function to ensure error details are JSON serializable
-                def _make_serializable(data: Any) -> Any:
-                    if isinstance(data, (str, int, float, bool, type(None))):
-                        return data
-                    elif isinstance(data, dict):
-                        return {str(k): _make_serializable(v) for k, v in data.items()}
-                    elif isinstance(data, (list, tuple)):
-                        return [_make_serializable(item) for item in data]
-                    else:
-                        # Convert any other type to its string representation
-                        return str(data)
-
-                serializable_errors = _make_serializable(e.errors())
-
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message="Input validation failed.",
-                    error_type="InputValidationError", # Added error type
-                    validation_details=serializable_errors
-                )
-                return JSONResponse(content=error_payload.model_dump(), status_code=422)
-            
-            try:
-                tool_output_model = update_page_logic(client=client, inputs=parsed_inputs)
-                response_object = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="success",
-                    outputs=tool_output_model.model_dump(exclude_none=True) 
-                )
-                return response_object
-            except HTTPException as http_exc: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=str(http_exc.detail),
-                    error_type=type(http_exc).__name__ 
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-            except Exception as e: 
-                error_payload = MCPExecuteResponse(
-                    tool_name=tool_name,
-                    status="error",
-                    error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
-                    error_type="ToolLogicError"
-                ).model_dump(exclude_none=True)
-                return JSONResponse(content=error_payload, status_code=500)
-
-        else:
-            # This case handles tools that are in AVAILABLE_TOOLS but not explicitly in the if/elif chain.
-            # For robust error handling, this path should also return a JSONResponse with a proper status code.
-            error_payload = MCPExecuteResponse(
-                tool_name=tool_name,
-                status="error",
-                error_message=f"Execution logic for tool '{tool_name}' is not implemented in the /execute endpoint.",
-                error_type="NotImplementedError"
-            ).model_dump(exclude_none=True)
-            return JSONResponse(content=error_payload, status_code=501) # 501 Not Implemented
-
-    except HTTPException as http_exc:
-        # Handles errors from get_confluence_client() or other top-level HTTPExceptions before tool logic
-        print(f"DEBUG MAIN: Outer HTTPException caught: {http_exc.status_code} - {http_exc.detail}")
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name, 
-            status="error",
-            error_message=str(http_exc.detail), 
-            # Attempt to classify error based on status code, or use a generic type
-            error_type="ServiceConfigurationError" if http_exc.status_code == 503 else type(http_exc).__name__
-        ).model_dump(exclude_none=True)
-        return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-    except Exception as e:
-        # Catch-all for other unexpected errors during tool dispatch or pre-tool-logic phase
-        print(f"DEBUG MAIN: Outer Generic Exception caught: {type(e).__name__} - {str(e)}")
-        import traceback
-        print(traceback.format_exc())
+    if not logic_function or not input_schema_class:
+        # This case indicates an internal configuration error
         error_payload = MCPExecuteResponse(
             tool_name=tool_name,
             status="error",
-            error_message=f"An unexpected server error occurred while preparing to execute tool '{tool_name}'.",
-            error_type="ServerError"
-        ).model_dump(exclude_none=True)
+            error_message=f"Internal configuration error for tool '{tool_name}': Missing logic or input schema.",
+            error_type="ConfigurationError"
+        ).model_dump(exclude_none=False)
+        return JSONResponse(content=error_payload, status_code=500)
+
+    try:
+        parsed_inputs = input_schema_class.model_validate(inputs)
+    except ValidationError as e:
+        serializable_errors = make_errors_json_serializable(e.errors())
+        error_payload = MCPExecuteResponse(
+            tool_name=tool_name,
+            status="error",
+            error_message="Input validation failed.",
+            error_type="InputValidationError",
+            validation_details=serializable_errors # Use the sanitized errors
+        ).model_dump(exclude_none=False)
+        return JSONResponse(content=error_payload, status_code=422)
+
+    try:
+        client = get_confluence_client()
+        tool_output_model = await logic_function(client=client, inputs=parsed_inputs)
+        logger.debug(f"Logic function {logic_function.__name__} returned: {tool_output_model}")
+
+        # Handle case where logic function returns None (e.g., resource not found)
+        if tool_output_model is None:
+            logger.warning(f"{logic_function.__name__} returned None, raising 404.")
+            raise HTTPException(status_code=404, detail=f"{tool_name} resource not found.")
+
+        # Prepare success response
+        response = MCPExecuteResponse(
+            tool_name=tool_name,
+            status="success",
+            outputs=tool_output_model.model_dump(exclude_none=False) 
+        )
+        return response
+
+    except HTTPException as http_exc: 
+        error_payload = MCPExecuteResponse(
+            tool_name=tool_name,
+            status="error",
+            error_message=http_exc.detail, # Use detail directly
+            error_type=type(http_exc).__name__ 
+        ).model_dump(exclude_none=False)
+        return JSONResponse(content=error_payload, status_code=http_exc.status_code)
+    except Exception as e: 
+        error_payload = MCPExecuteResponse(
+            tool_name=tool_name,
+            status="error",
+            error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
+            error_type="ToolLogicError"
+        ).model_dump(exclude_none=False)
         return JSONResponse(content=error_payload, status_code=500)
 
 app.include_router(router)

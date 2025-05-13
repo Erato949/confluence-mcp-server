@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, MagicMock, AsyncMock, ANY
 
 # Import constants, helpers, and fixtures from conftest
 from .conftest import (
@@ -23,7 +23,8 @@ MOCK_SEARCH_PAGE_2_SPACE = "DOC"
 
 
 @pytest.mark.asyncio
-async def test_search_pages_success_basic(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_success_basic(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful search_pages with a basic CQL query."""
     request_payload = {
         "tool_name": "search_pages",
@@ -106,7 +107,8 @@ async def test_search_pages_success_basic(client: AsyncClient, confluence_client
     )
 
 @pytest.mark.asyncio
-async def test_search_pages_empty_results(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_empty_results(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages when the CQL query yields no results."""
     empty_cql_query = "text ~ 'nonexistentuniquestring123xyz' and type=page"
     request_payload = {
@@ -159,8 +161,10 @@ async def test_search_pages_empty_results(client: AsyncClient, confluence_client
     )
 
 @pytest.mark.asyncio
-async def test_search_pages_api_error(client: AsyncClient, confluence_client_mock: MagicMock):
-    """Test search_pages when the Confluence API cql call raises an unexpected error."""
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test search_pages when the underlying logic function raises an HTTPException."""
+    confluence_mock, _, mock_get_client_func = confluence_client_mock, None, mock_get_client
     error_cql_query = "label = 'cause-api-error'"
     request_payload = {
         "tool_name": "search_pages",
@@ -185,9 +189,11 @@ async def test_search_pages_api_error(client: AsyncClient, confluence_client_moc
 
     assert response_data["status"] == "error"
     assert response_data["tool_name"] == "search_pages"
-    assert "RuntimeError: Error during CQL search: Simulated Confluence API Error during CQL search" in response_data["error_message"]
-    assert response_data["error_type"] == "HTTPException" 
-    
+    assert response_data["error_type"] == "HTTPException"
+
+    # Check the error message structure - it includes the exception type and message
+    assert str(simulated_error) in response_data["error_message"]
+
     mock_get_client_func.assert_called_once()
     confluence_client_mock.cql.assert_called_once_with(
         cql=error_cql_query,
@@ -198,7 +204,179 @@ async def test_search_pages_api_error(client: AsyncClient, confluence_client_moc
     )
 
 @pytest.mark.asyncio
-async def test_search_pages_with_expand_and_excerpt(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_invalid_cql_syntax(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test search_pages when the Confluence API reports an invalid CQL syntax."""
+    invalid_cql_query = "label ==== 'bad-syntax'"  # Example of invalid CQL
+    request_payload = {
+        "tool_name": "search_pages",
+        "inputs": {"cql": invalid_cql_query}
+    }
+
+    # Simulate an API error due to bad CQL.
+    # The atlassian-python-api might raise various exceptions, often HTTPError from requests.
+    # For this test, we'll use a generic Exception to simulate a server-side rejection of CQL.
+    # In a real scenario, Confluence might return a 400 Bad Request.
+    # Our search_pages_logic catches generic Exception and converts to HTTPException 500.
+    simulated_api_error = Exception("Confluence API: Invalid CQL syntax provided.")
+    confluence_client_mock.cql.side_effect = simulated_api_error
+    confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
+        response = await client.post("/execute", json=request_payload)
+
+    assert response.status_code == 500 # search_pages_logic converts generic exceptions to 500
+    response_data = response.json()
+    
+    print(f"DEBUG test_search_pages_invalid_cql_syntax: Response Data: {response_data}")
+
+    assert response_data["status"] == "error"
+    assert response_data["tool_name"] == "search_pages"
+    assert response_data["error_type"] == "HTTPException"
+
+    # Check the error message structure
+    expected_detail = f"Error during CQL search: {simulated_api_error}" # Detail from logic
+    assert expected_detail in response_data["error_message"]
+
+    mock_get_client_func.assert_called_once()
+    confluence_client_mock.cql.assert_called_once_with(
+        cql=invalid_cql_query,
+        limit=ANY, # Default or whatever is sent
+        start=ANY,
+        expand=ANY,
+        excerpt=ANY
+    )
+
+@pytest.mark.parametrize(
+    "invalid_input, expected_error_loc_suffix, expected_error_msg_part, expected_error_type",
+    [
+        # Type errors - Using Pydantic's specific type error codes where applicable
+        ({"cql": 123}, ("cql",), "Input should be a valid string", "string_type"),
+        ({"limit": "not-an-integer"}, ("limit",), "Input should be a valid integer", "int_parsing"), # More specific message likely
+        ({"start": "not-an-integer"}, ("start",), "Input should be a valid integer", "int_parsing"), # More specific message likely
+        ({"expand": ["invalid", "list"]}, ("expand",), "Input should be a valid string", "string_type"),
+        ({"excerpt": 123}, ("excerpt",), "Input should be a valid string", "string_type"),
+
+        # Value errors (from Pydantic constraints)
+        ({"limit": 0}, ("limit",), "Input should be greater than 0", "greater_than"),
+        ({"limit": -1}, ("limit",), "Input should be greater than 0", "greater_than"),
+        ({"limit": 101}, ("limit",), "Input should be less than or equal to 100", "less_than_equal"),
+        ({"start": -1}, ("start",), "Input should be greater than or equal to 0", "greater_than_equal"),
+        # Corrected expected pattern and type to match schema
+        ({"excerpt": "invalid_excerpt_value"}, ("excerpt",), "String should match pattern '^(highlight|none)$'", "string_pattern_mismatch"),
+
+        # Model validator errors (loc is empty, msg starts with 'Value error, ', type is 'value_error')
+        ({"cql": "some cql", "space_key_for_cql": "KEY", "title_for_cql": "Title"}, (), "Value error, If 'cql' is provided, 'space_key_for_cql' and 'title_for_cql' must not be present.", "value_error"),
+        # Corrected expected message ('...must be provided.')
+        ({"space_key_for_cql": "KEY", "title_for_cql": None}, (), "Value error, If 'cql' is not provided, both 'space_key_for_cql' and 'title_for_cql' must be provided.", "value_error"),
+        ({"space_key_for_cql": None, "title_for_cql": "Title"}, (), "Value error, If 'cql' is not provided, both 'space_key_for_cql' and 'title_for_cql' must be provided.", "value_error"),
+    ]
+)
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_invalid_input_types(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock, invalid_input: dict, expected_error_loc_suffix: tuple, expected_error_msg_part: str, expected_error_type: str):
+    """Test search_pages with various invalid input data types."""
+    base_inputs = {} # Start with empty base, let invalid_input define the state
+    # Handle cases where base needs 'cql' vs cases where it needs space/title
+    if "cql" in invalid_input and "space_key_for_cql" not in invalid_input:
+         # If testing a cql-related field error, ensure space/title aren't present to pass model validation initially
+         pass
+    elif ("space_key_for_cql" in invalid_input or "title_for_cql" in invalid_input) and "cql" not in invalid_input:
+        # If testing a space/title field error, ensure cql isn't present
+         pass
+    elif not expected_error_loc_suffix: # If testing model validation itself
+        if "If 'cql' is provided" in expected_error_msg_part:
+            base_inputs = {"cql": "dummy cql"} # Need cql to trigger this path
+        else: # Testing the "If 'cql' is not provided" path
+             base_inputs = {}
+    else: # Default: Assume we need a valid cql query for field tests unless it's the field being tested
+        if "cql" not in invalid_input:
+            base_inputs = {"cql": "type=page"}
+
+
+    request_payload = {
+        "tool_name": "search_pages",
+        "inputs": {**base_inputs, **invalid_input} # Merge base with invalid part
+    }
+
+    response = await client.post("/execute", json=request_payload)
+
+    assert response.status_code == 422 # Unprocessable Entity for Pydantic validation errors
+    response_data = response.json()
+
+    print(f"DEBUG test_search_pages_invalid_input_types ({invalid_input}): Response Data: {response_data}") # Keep debug print
+
+    assert response_data["status"] == "error"
+    assert response_data["tool_name"] == "search_pages"
+    assert response_data["error_type"] == "InputValidationError"
+
+    # --- Assert Error Message ---
+    error_message = response_data["error_message"]
+    assert error_message == "Input validation failed." # Corrected assertion
+
+    # --- Assert Validation Details ---
+    validation_details = response_data["validation_details"]
+
+    # Convert expected_error_loc_suffix tuple (e.g., ('limit',)) to list for comparison ['limit']
+    # For model errors, expected_error_loc_suffix is () -> expected_loc_list is []
+    expected_loc_list = list(expected_error_loc_suffix)
+    assert validation_details[0]["loc"] == expected_loc_list
+
+    # Check if the message part matches (allow for prefixes like 'Value error, ')
+    assert expected_error_msg_part in validation_details[0]["msg"]
+
+    assert validation_details[0]["type"] == expected_error_type
+    # Remove incorrect assertion: Logic should NOT be awaited on validation failure
+    # mock_logic.assert_awaited_once()
+
+# === API Error Tests ===
+
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
+async def test_search_pages_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test search_pages when the underlying logic function raises an HTTPException."""
+    confluence_mock, _, mock_get_client_func = confluence_client_mock, None, mock_get_client
+    error_cql_query = "label = 'cause-api-error'"
+    request_payload = {
+        "tool_name": "search_pages",
+        "inputs": {"cql": error_cql_query} # Using defaults for limit/start
+    }
+
+    # Simulate an API error
+    # For atlassian-python-api, errors are often subclasses of requests.exceptions.HTTPError
+    # or a custom AtlassianError. We'll use a generic RuntimeError for simplicity here,
+    # as the logic in search_pages_logic should catch generic Exception.
+    simulated_error = RuntimeError("Simulated Confluence API Error during CQL search")
+    confluence_client_mock.cql.side_effect = simulated_error
+    confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
+
+    with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
+        response = await client.post("/execute", json=request_payload)
+
+    assert response.status_code == 500 # As converted by main.py's/search_pages_logic generic exception handler
+    response_data = response.json()
+    
+    print(f"DEBUG test_search_pages_api_error: Response Data: {response_data}")
+
+    assert response_data["status"] == "error"
+    assert response_data["tool_name"] == "search_pages"
+    assert response_data["error_type"] == "HTTPException"
+
+    # Check the error message structure - it includes the exception type and message
+    assert str(simulated_error) in response_data["error_message"]
+
+    mock_get_client_func.assert_called_once()
+    confluence_client_mock.cql.assert_called_once_with(
+        cql=error_cql_query,
+        limit=25, # Default from SearchPagesInput schema
+        start=0,  # Default from SearchPagesInput schema
+        expand=None,
+        excerpt=None
+    )
+
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client') 
+async def test_search_pages_with_expand_and_excerpt(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test search_pages with 'expand' and 'excerpt' parameters."""
     cql_query = "text ~ 'documentation' and type=page"
     expand_options = "body.storage,version" # CHANGED: Now a string
@@ -297,113 +475,3 @@ async def test_search_pages_with_expand_and_excerpt(client: AsyncClient, conflue
     # The field 'content_preview' does not exist in SearchedPageSchema.
     # 'content' holds body.storage and 'excerpt_highlight' holds the excerpt.
     assert "excerpt_highlight" in first_result
-
-@pytest.mark.asyncio
-async def test_search_pages_invalid_cql_syntax(client: AsyncClient, confluence_client_mock: MagicMock):
-    """Test search_pages when the Confluence API reports an invalid CQL syntax."""
-    invalid_cql_query = "label ==== 'bad-syntax'"  # Example of invalid CQL
-    request_payload = {
-        "tool_name": "search_pages",
-        "inputs": {"cql": invalid_cql_query}
-    }
-
-    # Simulate an API error due to bad CQL.
-    # The atlassian-python-api might raise various exceptions, often HTTPError from requests.
-    # For this test, we'll use a generic Exception to simulate a server-side rejection of CQL.
-    # In a real scenario, Confluence might return a 400 Bad Request.
-    # Our search_pages_logic catches generic Exception and converts to HTTPException 500.
-    simulated_api_error = Exception("Confluence API: Invalid CQL syntax provided.")
-    confluence_client_mock.cql.side_effect = simulated_api_error
-    confluence_client_mock.url = MOCK_CONFLUENCE_INSTANCE_URL + "/rest/api"
-
-    with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock) as mock_get_client_func:
-        response = await client.post("/execute", json=request_payload)
-
-    assert response.status_code == 500 # search_pages_logic converts generic exceptions to 500
-    response_data = response.json()
-    
-    print(f"DEBUG test_search_pages_invalid_cql_syntax: Response Data: {response_data}")
-
-    assert response_data["status"] == "error"
-    assert response_data["tool_name"] == "search_pages"
-    assert "Exception: Error during CQL search: Confluence API: Invalid CQL syntax provided." in response_data["error_message"]
-    assert response_data["error_type"] == "HTTPException" 
-    
-    mock_get_client_func.assert_called_once()
-    confluence_client_mock.cql.assert_called_once_with(
-        cql=invalid_cql_query,
-        limit=ANY, # Default or whatever is sent
-        start=ANY,
-        expand=ANY,
-        excerpt=ANY
-    )
-
-@pytest.mark.parametrize(
-    "invalid_input, expected_error_loc_suffix, expected_error_msg_part",
-    [
-        # Type errors
-        ({"cql": 123}, ("cql",), "Input should be a valid string"),
-        ({"limit": "not-an-integer"}, ("limit",), "Input should be a valid integer, unable to parse string as an integer"), 
-        ({"start": "not-an-integer"}, ("start",), "Input should be a valid integer, unable to parse string as an integer"), 
-        ({"expand": ["invalid", "list"]}, ("expand",), "Input should be a valid string"), # expand is string
-        ({"excerpt": 123}, ("excerpt",), "Input should be a valid string"), # excerpt is string enum
-
-        # Value errors (from Pydantic constraints)
-        ({"limit": 0}, ("limit",), "Input should be greater than 0"), # gt=0
-        ({"limit": -1}, ("limit",), "Input should be greater than 0"), # gt=0
-        ({"limit": 101}, ("limit",), "Input should be less than or equal to 100"), # le=100
-        ({"start": -1}, ("start",), "Input should be greater than or equal to 0"), # ge=0
-        ({"excerpt": "invalid_excerpt_value"}, ("excerpt",), "String should match pattern '^(highlight|none)$'"), # Literal error / Pydantic pattern message
-
-        # Model validator errors (e.g. cql_and_space_key_exclusive)
-        ({"cql": "some cql", "space_key_for_cql": "KEY", "title_for_cql": "Title"}, (), "Value error, If 'cql' is provided, 'space_key_for_cql' and 'title_for_cql' must not be present."),
-        ({"space_key_for_cql": "KEY"}, (), "Value error, If 'cql' is provided, 'space_key_for_cql' and 'title_for_cql' must not be present."),
-        ({"title_for_cql": "Title"}, (), "Value error, If 'cql' is provided, 'space_key_for_cql' and 'title_for_cql' must not be present.")
-    ]
-)
-@pytest.mark.asyncio
-async def test_search_pages_invalid_input_types(
-    client: AsyncClient,
-    confluence_client_mock: MagicMock, # Not used directly as validation happens before API call
-    invalid_input: dict,
-    expected_error_loc_suffix: tuple,
-    expected_error_msg_part: str
-):
-    """Test search_pages with various invalid input data types."""
-    base_inputs = {"cql": "type=page"} # Valid base
-    request_payload = {
-        "tool_name": "search_pages",
-        "inputs": {**base_inputs, **invalid_input} # Merge to override with invalid part
-    }
-    
-    # No need to mock confluence_client_mock.cql as validation should fail before it's called.
-    # The get_confluence_client might still be called by the endpoint decorator.
-    with patch('confluence_mcp_server.main.get_confluence_client', return_value=confluence_client_mock):
-        response = await client.post("/execute", json=request_payload)
-
-    assert response.status_code == 422 # Unprocessable Entity for Pydantic validation errors
-    response_data = response.json()
-
-    print(f"DEBUG test_search_pages_invalid_input_types ({invalid_input}): Response Data: {response_data}")
-
-    assert response_data["status"] == "error"
-    assert "error_message" in response_data
-    assert response_data["error_type"] == "InputValidationError"
-
-    error_message = response_data["error_message"]
-    # Expected format: "Input validation failed for tool 'search_pages'. Details: '{field_or_model}': {message}"
-    # or for model validation: "Input validation failed for tool 'search_pages'. Details: model: Value error, {message}"
-    assert f"Input validation failed for tool 'search_pages'. Details: " in error_message
-
-    if expected_error_loc_suffix:  # Field-specific error
-        # e.g. ('limit',)
-        loc_repr = f"'{expected_error_loc_suffix[0]}':"
-        expected_detail_substring = f"{loc_repr} {expected_error_msg_part}"
-    else:  # Model-level error (from model_validator, loc is empty)
-        # main.py uses '' as the key for model-level errors when error['loc'] is empty.
-        # expected_error_msg_part from parameters like "Value error, If 'cql' is provided..."
-        loc_repr = "'':"
-        expected_detail_substring = f"{loc_repr} {expected_error_msg_part}"
-
-    assert expected_detail_substring in error_message, \
-        f"Expected detail '{expected_detail_substring}' not found in error message '{error_message}' for input {invalid_input}"

@@ -18,12 +18,14 @@ MOCK_CONFLUENCE_WEB_BASE_URL = f"{MOCK_CONFLUENCE_INSTANCE_URL}/wiki" # Full bas
 MOCK_PAGE_ID = 12345
 MOCK_PAGE_TITLE = "Test Page Title"
 MOCK_SPACE_KEY = "TESTSPACE"
+MOCK_SPACE_ID = "CONFLTESTSPACEID"  # Added MOCK_SPACE_ID
 MOCK_PAGE_VERSION = 1 # A generic version number for mocks
 MOCK_PAGE_STATUS = "current"
 
 MOCK_EXPAND_PARAMS = "body.storage,version"
 MOCK_NON_EXISTENT_PAGE_ID = 99999
 MOCK_PAGE_ID_NO_SPACE_TITLE_LOOKUP = 12346 # For specific test scenarios
+MOCK_PAGE_ID_BY_TITLE = 54321  # Added for tests needing a specific ID for title lookups
 
 # New constants for minimal content test
 MOCK_PAGE_ID_MINIMAL_CONTENT = 98765
@@ -35,6 +37,7 @@ def get_mock_confluence_page_data(
     page_id=MOCK_PAGE_ID, 
     title=MOCK_PAGE_TITLE, 
     space_key=MOCK_SPACE_KEY, 
+    space_id=None, 
     expand: str = None, 
     has_content=True, 
     has_version=True,
@@ -53,6 +56,9 @@ def get_mock_confluence_page_data(
         }
     }
     
+    if space_id is not None:
+        page_data["space"]["id"] = str(space_id) # Add space id to the space object if provided
+
     # Mocking expanded content based on 'expand' string and flags
     if expand:
         if "body.storage" in expand:
@@ -99,27 +105,15 @@ def get_mock_cql_search_results(cql_query: str, results: list, limit: int, start
 def client(request) -> AsyncClient:
     """
     An asynchronous test client for the FastAPI application, function-scoped.
-    Returns an AsyncClient instance directly. Attempts teardown (aclose) in finalizer.
+    Returns an AsyncClient instance directly. 
     Uses ASGITransport for httpx.
     """
     transport = ASGITransport(app=fastapi_app)
     ac = AsyncClient(transport=transport, base_url="http://test")
 
-    def finalizer():
-        print("DEBUG: Client fixture finalizer called. Attempting ac.aclose().")
-        try:
-            # Try to run ac.aclose(). This creates a new event loop or uses the existing one
-            # if not running. If called from within a running loop, it will raise RuntimeError.
-            asyncio.run(ac.aclose()) # This is the simplest way to call an async func from sync
-            print("DEBUG: AsyncClient.aclose() completed via asyncio.run().")
-        except RuntimeError as e:
-            # This typically means asyncio.run() was called from an already running event loop.
-            print(f"DEBUG: Could not close AsyncClient via asyncio.run() in finalizer: {e}. Client might remain open.")
-        except Exception as e:
-            print(f"DEBUG: General error during AsyncClient.aclose() attempt in finalizer: {e}")
-
-    request.addfinalizer(finalizer)
-    return ac
+    # Finalizer removed to prevent RuntimeError from asyncio.run()
+    # within the pytest-asyncio managed event loop.
+    return ac # Return the client directly
 
 @pytest.fixture
 def confluence_client_mock() -> MagicMock:

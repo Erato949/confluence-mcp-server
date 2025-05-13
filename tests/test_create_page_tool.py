@@ -4,6 +4,8 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import MagicMock, patch
 import os # For accessing environment variables if needed for CONFLUENCE_URL
+from confluence_mcp_server.main import app
+from confluence_mcp_server.mcp_actions.schemas import MCPExecuteRequest, CreatePageOutput, CreatePageInput
 
 # Assuming your FastAPI app instance is named 'app' in 'confluence_mcp_server.main'
 # and CONFLUENCE_URL is accessible or mockable for tests.
@@ -11,7 +13,8 @@ import os # For accessing environment variables if needed for CONFLUENCE_URL
 BASE_CONFLUENCE_URL = os.getenv("CONFLUENCE_URL", "http://test-confluence.com") # Get from env or use a default for tests
 
 @pytest.mark.asyncio
-async def test_create_page_success_top_level(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
+async def test_create_page_success_top_level(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful creation of a top-level page."""
     tool_name = "create_page"
     mock_page_id = 12345
@@ -38,14 +41,26 @@ async def test_create_page_success_top_level(client: AsyncClient, confluence_cli
             "self": f"{BASE_CONFLUENCE_URL}/rest/api/content/{mock_page_id}"
         }
     }
+    mock_get_client.return_value = confluence_client_mock # Ensure the main app uses our specific confluence_client_mock
     confluence_client_mock.create_page.return_value = mock_api_response
+    # Set the mock client's URL attribute, needed by get_confluence_page_url helper
+    confluence_client_mock.url = BASE_CONFLUENCE_URL.rstrip('/')
 
-    execute_payload = {
-        "tool_name": tool_name,
-        "inputs": inputs
-    }
+    expected_output = CreatePageOutput(
+        page_id=mock_page_id,
+        title=mock_title,
+        space_key=mock_space_key,
+        version=1,
+        status="current",  # Added status
+        url=f"{confluence_client_mock.url}/display/{mock_space_key}/My+New+Test+Page" # Corrected web_url to url
+    )
 
-    response = await client.post("/execute", json=execute_payload)
+    execute_payload = MCPExecuteRequest(
+        tool_name=tool_name,
+        inputs=inputs # Pass the raw dict, not the Pydantic object
+    )
+
+    response = await client.post("/execute", json=execute_payload.model_dump())
 
     print(f"Test Response Status: {response.status_code}")
     print(f"Test Response JSON: {response.json()}")
@@ -62,21 +77,20 @@ async def test_create_page_success_top_level(client: AsyncClient, confluence_cli
     assert outputs["space_key"] == mock_space_key
     assert outputs["version"] == 1
     assert outputs["status"] == "current"
-    assert outputs["url"] == f"{BASE_CONFLUENCE_URL.rstrip('/')}/display/{mock_space_key}/My+New+Test+Page"
+    assert outputs["url"] == f"{confluence_client_mock.url}/display/{mock_space_key}/My+New+Test+Page"
 
     # Verify the mock was called correctly
     confluence_client_mock.create_page.assert_called_once_with(
         space=mock_space_key,
         title=mock_title,
         body=mock_content,
-        parent_id=None,
         type='page',
-        representation='storage',
-        editor='v2'
+        representation='storage' # Ensure 'editor' argument is removed
     )
 
 @pytest.mark.asyncio
-async def test_create_page_success_child_page(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
+async def test_create_page_success_child_page(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test successful creation of a page as a child of another page."""
     tool_name = "create_page"
     mock_page_id = 56789
@@ -84,6 +98,9 @@ async def test_create_page_success_child_page(client: AsyncClient, confluence_cl
     mock_title = "My New Child Page"
     mock_space_key = "TESTSPACE"
     mock_content = "<p>This is a child page content.</p>"
+
+    # Add this line to properly mock the client used by the application
+    mock_get_client.return_value = confluence_client_mock
 
     inputs = {
         "space_key": mock_space_key,
@@ -93,25 +110,34 @@ async def test_create_page_success_child_page(client: AsyncClient, confluence_cl
     }
 
     mock_api_response = {
-        "id": str(mock_page_id),
+        "id": mock_page_id,
         "title": mock_title,
-        "space": {"key": mock_space_key},
-        "ancestors": [{"id": str(mock_parent_page_id)}], # Indicate parentage
-        "version": {"number": 1, "message": "", "minorEdit": False},
-        "status": "current",
-        "_links": {
-            "webui": f"/display/{mock_space_key}/My+New+Child+Page",
-            "self": f"{BASE_CONFLUENCE_URL}/rest/api/content/{mock_page_id}"
-        }
+        "space": {"key": mock_space_key}, # Include space key in response
+        "version": {"number": 1},
+        "status": "current", 
+        "ancestors": [{"id": str(mock_parent_page_id)}], # Simulate API returning parent info
+        "_links": {"webui": f"/display/{mock_space_key}/{mock_title.replace(' ', '+')}"}
     }
     confluence_client_mock.create_page.return_value = mock_api_response
+    # Set the mock client's URL attribute, needed by get_confluence_page_url helper
+    confluence_client_mock.url = BASE_CONFLUENCE_URL.rstrip('/')
 
-    execute_payload = {
-        "tool_name": tool_name,
-        "inputs": inputs
-    }
+    expected_output = CreatePageOutput(
+        page_id=mock_page_id,
+        title=mock_title,
+        space_key=mock_space_key,
+        version=1,
+        parent_page_id=mock_parent_page_id,
+        status="current", # Added status
+        url=f"{confluence_client_mock.url}/display/{mock_space_key}/{mock_title.replace(' ', '+')}" # Corrected web_url to url
+    )
 
-    response = await client.post("/execute", json=execute_payload)
+    execute_payload = MCPExecuteRequest(
+        tool_name=tool_name,
+        inputs=inputs # Pass the raw dict, not the Pydantic object
+    )
+
+    response = await client.post("/execute", json=execute_payload.model_dump())
 
     assert response.status_code == 200
     response_data = response.json()
@@ -122,16 +148,16 @@ async def test_create_page_success_child_page(client: AsyncClient, confluence_cl
     assert outputs["space_key"] == mock_space_key
     assert outputs["version"] == 1
     assert outputs["status"] == "current"
-    assert outputs["url"] == f"{BASE_CONFLUENCE_URL.rstrip('/')}/display/{mock_space_key}/My+New+Child+Page"
+    assert outputs["url"] == f"{confluence_client_mock.url}/display/{mock_space_key}/{mock_title.replace(' ', '+')}"
 
+    # Verify the mock was called correctly
     confluence_client_mock.create_page.assert_called_once_with(
         space=mock_space_key,
         title=mock_title,
         body=mock_content,
-        parent_id=str(mock_parent_page_id), # Ensure parent_id is string if API expects it
+        parent_id=str(mock_parent_page_id), # Ensure parent_id is passed as string
         type='page',
-        representation='storage',
-        editor='v2'
+        representation='storage' # Ensure 'editor' argument is removed
     )
 
 @pytest.mark.parametrize(
@@ -144,7 +170,8 @@ async def test_create_page_success_child_page(client: AsyncClient, confluence_cl
     ]
 )
 @pytest.mark.asyncio
-async def test_create_page_invalid_inputs(client: AsyncClient, confluence_client_mock: MagicMock, invalid_input: dict, expected_error_loc_suffix: str, expected_error_msg_part: str):
+@patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
+async def test_create_page_invalid_inputs(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock, invalid_input: dict, expected_error_loc_suffix: str, expected_error_msg_part: str):
     """Test create_page tool with various invalid inputs."""
     tool_name = "create_page"
     
@@ -186,6 +213,7 @@ async def test_create_page_invalid_inputs(client: AsyncClient, confluence_client
     assert response_data["tool_name"] == tool_name
     assert response_data["status"] == "error"
     assert response_data["error_type"] == "InputValidationError"
+    assert response_data["error_message"] == "Input validation failed." # Corrected error message check
     assert "validation_details" in response_data
 
     validation_errors = response_data["validation_details"]
@@ -206,7 +234,8 @@ async def test_create_page_invalid_inputs(client: AsyncClient, confluence_client
     confluence_client_mock.create_page.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_create_page_api_error(client: AsyncClient, confluence_client_mock: MagicMock):
+@patch('confluence_mcp_server.main.get_confluence_client') # Keep mocking client retrieval
+async def test_create_page_api_error(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
     """Test handling of an API error during page creation."""
     tool_name = "create_page"
     inputs = {
@@ -216,11 +245,13 @@ async def test_create_page_api_error(client: AsyncClient, confluence_client_mock
         "parent_page_id": None
     }
 
-    # Simulate an API error
-    # The atlassian-python-api might raise various exceptions, 
-    # often subclasses of requests.exceptions.HTTPError, or its own custom exceptions.
-    # We'll use a generic RuntimeError for simplicity, as our logic catches Exception.
+    # Simulate an API error from the actual logic function
+    # The logic catches ApiError or general Exception and raises HTTPException
+    # We mock the underlying client call to raise the error the logic would catch
     error_message = "Simulated Confluence API Error during page creation"
+    # Use RuntimeError which inherits from Exception, similar to previous setup
+    # This will be caught by the logic's general Exception handler
+    mock_get_client.return_value = confluence_client_mock # Ensure the main app uses our specific confluence_client_mock
     confluence_client_mock.create_page.side_effect = RuntimeError(error_message)
 
     execute_payload = {
@@ -230,12 +261,21 @@ async def test_create_page_api_error(client: AsyncClient, confluence_client_mock
 
     response = await client.post("/execute", json=execute_payload)
 
-    assert response.status_code == 500 # Or appropriate error code based on main.py's handling
+    # Assert the response based on the HTTPException raised by the *logic*
+    assert response.status_code == 500 # Status code from logic's general Exception handler
     response_data = response.json()
     assert response_data["tool_name"] == tool_name
     assert response_data["status"] == "error"
-    assert response_data["error_type"] == "HTTPException" # Changed from ToolLogicError
-    expected_api_error_detail = f"Server Error (RuntimeError): Error during page creation: {error_message}"
-    assert response_data["error_message"] == expected_api_error_detail
+    # Check the error type and message from the HTTPException raised by the *logic*
+    assert response_data["error_type"] == "HTTPException" # Corrected expected error type
+    # Assert the specific detail message format from the generic exception handler
+    assert response_data["error_message"] == f"Error creating page in Confluence: Details: {error_message}"
 
-    confluence_client_mock.create_page.assert_called_once()
+    # Verify the mock was called correctly
+    confluence_client_mock.create_page.assert_called_once_with(
+        space=inputs["space_key"],
+        title=inputs["title"],
+        body=inputs["content"],
+        type='page',
+        representation='storage'
+    )

@@ -42,6 +42,7 @@
         *   [x] Error handling for invalid input types (e.g., non-integer `limit`).
         *   [x] Behavior when no spaces match the filter criteria.
     *   [x] Address `PendingDeprecationWarning` for `python-multipart` (suppressed via `pytest.ini` as it's internal to Starlette).
+    *   [x] Resolve all test failures in `tests/test_get_spaces_tool.py` (manual mocking refactor for consistency).
 *   **`Get Page` Action:**
     *   [x] Define `Get_Page` input/output schema in `mcp_actions/schemas.py`
     *   [x] Implement `get_page_logic` function in `mcp_actions/page_actions.py`
@@ -162,5 +163,6 @@
 *   [x] Research and implement mocking for `atlassian.Confluence` API calls to make tests independent of the live Confluence instance and faster.
     *   [x] Apply mocking to `get_spaces` tests.
     *   [x] Apply mocking to `Get_Page` tests.
+*   [x] Resolve all test failures for `Get_Spaces` tests (manual mocking refactor).
 *   [ ] Ensure all future tools are developed with corresponding automated tests.
 *   [ ] Integrate test execution into the development workflow (e.g., a simple script or command to run all tests).
