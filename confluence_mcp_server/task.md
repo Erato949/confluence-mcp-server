@@ -84,16 +84,16 @@
         *   [x] Error handling: version conflict (if `current_version_number` is stale).
         *   [x] Error handling: invalid input types.
 *   **`create_page` Action:**
-    *   [ ] Define `create_page` input/output schema in `mcp_actions/schemas.py`
-    *   [ ] Implement `create_page_logic` function in `mcp_actions/page_actions.py`
-    *   [ ] Integrate `create_page` into `main.py`'s `execute_tool`
-    *   [ ] Implement automated tests for `create_page` tool, covering:
-        *   [ ] Successful execution: creating a new page with title, space_key, and body.
-        *   [ ] Successful execution: creating a page under a parent page (`parent_page_id`).
-        *   [ ] Error handling: space not found (invalid `space_key`).
-        *   [ ] Error handling: parent page not found (invalid `parent_page_id`).
-        *   [ ] Error handling: page with the same title already exists in the space (if not allowed).
-        *   [ ] Error handling: invalid input types.
+    *   [x] Define `create_page` input/output schema in `mcp_actions/schemas.py`
+    *   [x] Implement `create_page_logic` function in `mcp_actions/page_actions.py`
+    *   [x] Integrate `create_page` into `main.py`'s `execute_tool`
+    *   [x] Implement automated tests for `create_page` tool, covering:
+        *   [x] Successful execution: creating a new page with title, space_key, and body.
+        *   [x] Successful execution: creating a page under a parent page (`parent_page_id`).
+        *   [x] Error handling: space not found (invalid `space_key`).
+        *   [x] Error handling: parent page not found (invalid `parent_page_id`).
+        *   [x] Error handling: page with the same title already exists in the space (if not allowed).
+        *   [x] Error handling: invalid input types.
 *   **`get_comments` Action:**
     *   [ ] Define `get_comments` input/output schema in `mcp_actions/schemas.py`
     *   [ ] Implement `get_comments_logic` function in `mcp_actions/comment_actions.py`

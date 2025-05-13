@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import MagicMock, patch
 import os # For accessing environment variables if needed for CONFLUENCE_URL
+from atlassian.errors import ApiError # Add this import
 from confluence_mcp_server.main import app
 from confluence_mcp_server.mcp_actions.schemas import MCPExecuteRequest, CreatePageOutput, CreatePageInput
 
@@ -272,6 +273,142 @@ async def test_create_page_api_error(mock_get_client, client: AsyncClient, confl
     assert response_data["error_message"] == f"Error creating page in Confluence: Details: {error_message}"
 
     # Verify the mock was called correctly
+    confluence_client_mock.create_page.assert_called_once_with(
+        space=inputs["space_key"],
+        title=inputs["title"],
+        body=inputs["content"],
+        type='page',
+        representation='storage'
+    )
+
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client')
+async def test_create_page_api_error_space_not_found(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test handling of an ApiError (e.g., space not found) during page creation."""
+    tool_name = "create_page"
+    inputs = {
+        "space_key": "NONEXISTENTSPACE",
+        "title": "Space Not Found Test Page",
+        "content": "<p>Content</p>",
+        "parent_page_id": None
+    }
+
+    # Simulate an ApiError from Confluence client
+    api_error_instance = ApiError(reason="Space not found")
+    api_error_instance.status_code = 404
+    api_error_instance.url = "http://test-confluence.com/rest/api/content"
+    api_error_instance.text = '{"statusCode":404,"message":"Space with key NONEXISTENTSPACE not found"}'
+
+    mock_get_client.return_value = confluence_client_mock
+    confluence_client_mock.create_page.side_effect = api_error_instance
+
+    execute_payload = {
+        "tool_name": tool_name,
+        "inputs": inputs
+    }
+
+    response = await client.post("/execute", json=execute_payload)
+
+    assert response.status_code == 404 # Expected status code from ApiError handling in logic
+    response_data = response.json()
+    assert response_data["tool_name"] == tool_name
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    # Check the detail message format from the ApiError handler in create_page_logic
+    expected_detail_message = f"Error creating page in Confluence: Details: Received {api_error_instance.status_code} {api_error_instance.reason} for url: {api_error_instance.url}\nResponse: {api_error_instance.text}"
+    assert response_data["error_message"] == expected_detail_message
+
+    confluence_client_mock.create_page.assert_called_once_with(
+        space=inputs["space_key"],
+        title=inputs["title"],
+        body=inputs["content"],
+        type='page',
+        representation='storage'
+    )
+
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client')
+async def test_create_page_api_error_parent_not_found(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test handling of an ApiError (e.g., parent page not found) during page creation."""
+    tool_name = "create_page"
+    inputs = {
+        "space_key": "VALIDSPACE",
+        "title": "Parent Not Found Test Page",
+        "content": "<p>Content for parent not found test</p>",
+        "parent_page_id": 999999  # A non-existent parent ID
+    }
+
+    # Simulate an ApiError from Confluence client for parent not found
+    api_error_instance = ApiError(reason="Bad Request - Parent page not found or invalid")
+    api_error_instance.status_code = 400
+    api_error_instance.url = "http://test-confluence.com/rest/api/content"
+    api_error_instance.text = '{"statusCode":400,"message":"Invalid parent_id: 999999"}'
+
+    mock_get_client.return_value = confluence_client_mock
+    confluence_client_mock.create_page.side_effect = api_error_instance
+
+    execute_payload = {
+        "tool_name": tool_name,
+        "inputs": inputs
+    }
+
+    response = await client.post("/execute", json=execute_payload)
+
+    assert response.status_code == 400 # Expected status code from ApiError handling in logic
+    response_data = response.json()
+    assert response_data["tool_name"] == tool_name
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    # Check the detail message format from the ApiError handler in create_page_logic
+    expected_detail_message = f"Error creating page in Confluence: Details: Received {api_error_instance.status_code} {api_error_instance.reason} for url: {api_error_instance.url}\nResponse: {api_error_instance.text}"
+    assert response_data["error_message"] == expected_detail_message
+
+    confluence_client_mock.create_page.assert_called_once_with(
+        space=inputs["space_key"],
+        title=inputs["title"],
+        body=inputs["content"],
+        parent_id=str(inputs["parent_page_id"]), # Ensure parent_id is passed as string
+        type='page',
+        representation='storage'
+    )
+
+@pytest.mark.asyncio
+@patch('confluence_mcp_server.main.get_confluence_client')
+async def test_create_page_api_error_duplicate_title(mock_get_client, client: AsyncClient, confluence_client_mock: MagicMock):
+    """Test handling of an ApiError when creating a page with a duplicate title in the same space."""
+    tool_name = "create_page"
+    inputs = {
+        "space_key": "VALIDSPACE",
+        "title": "Existing Page Title",
+        "content": "<p>Content for duplicate title test</p>",
+        "parent_page_id": None 
+    }
+
+    # Simulate an ApiError from Confluence client for duplicate title
+    api_error_instance = ApiError(reason="Bad Request - A page with this title already exists in this space")
+    api_error_instance.status_code = 400
+    api_error_instance.url = "http://test-confluence.com/rest/api/content"
+    api_error_instance.text = '{"statusCode":400,"message":"A page with this title already exists in space VALIDSPACE"}'
+
+    mock_get_client.return_value = confluence_client_mock
+    confluence_client_mock.create_page.side_effect = api_error_instance
+
+    execute_payload = {
+        "tool_name": tool_name,
+        "inputs": inputs
+    }
+
+    response = await client.post("/execute", json=execute_payload)
+
+    assert response.status_code == 400 # Expected status code from ApiError handling in logic
+    response_data = response.json()
+    assert response_data["tool_name"] == tool_name
+    assert response_data["status"] == "error"
+    assert response_data["error_type"] == "HTTPException"
+    # Check the detail message format from the ApiError handler in create_page_logic
+    expected_detail_message = f"Error creating page in Confluence: Details: Received {api_error_instance.status_code} {api_error_instance.reason} for url: {api_error_instance.url}\nResponse: {api_error_instance.text}"
+    assert response_data["error_message"] == expected_detail_message
+
     confluence_client_mock.create_page.assert_called_once_with(
         space=inputs["space_key"],
         title=inputs["title"],
