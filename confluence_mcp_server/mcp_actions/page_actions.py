@@ -353,33 +353,40 @@ async def create_page_logic(
 
     except ApiError as e:
         # Log the specific API error
-        api_status_code = e.status_code if hasattr(e, 'status_code') and e.status_code is not None else 500
-        # The actual api_reason for logging can remain simple as str(e) or e.reason
-        logger.error(f"ERROR: API error during page creation: {api_status_code} - {getattr(e, 'reason', str(e))}")
+        api_status_code = 500 # Default
 
-        # Determine HTTP status code for the response
-        http_status_code = 400 # Default for API errors like duplicate title, bad request
-        if api_status_code == 404: # Specific case for space not found or parent not found (if we map it to 404)
-            http_status_code = 404
-        elif api_status_code == 409: # Conflict, e.g. duplicate title often is 409, but atlassian-python-api might use 400
-            http_status_code = 409 # Or stick to 400 if that's what the underlying API gives for this client
-        # If e.status_code is a valid HTTP error code, use it directly for the HTTPException
-        if isinstance(api_status_code, int) and 400 <= api_status_code < 600:
+        # Try getting status from response first
+        if hasattr(e, 'response') and e.response is not None and hasattr(e.response, 'status_code') and e.response.status_code is not None:
+            api_status_code = e.response.status_code
+        # Fallback to checking status directly on the error object (for test mocks)
+        elif hasattr(e, 'status_code') and e.status_code is not None:
+            api_status_code = e.status_code
+
+        api_reason = str(e) # Keep using str(e) for the main reason
+        logger.error(f"ERROR: API error during page creation: {api_status_code} - {api_reason}")
+
+        # Determine HTTP status code for the response based on extracted api_status_code
+        http_status_code = 500 # Default HTTPException status to 500 for unexpected API errors
+        if isinstance(api_status_code, int) and 400 <= api_status_code < 500:
+             # If it's a 4xx error from the API, use that status for the HTTPException
             http_status_code = api_status_code
+        # Add specific mappings if needed, e.g., map 409 to 409
+        elif api_status_code == 409:
+             http_status_code = 409
+        # Add other mappings as necessary...
+        # Note: The previous logic defaulted to 400 here, but 500 might be safer default for uncategorized API errors
 
-        # Construct the detailed message for the HTTPException
-        status_code_val = getattr(e, 'status_code', 'N/A')
-        reason_val = getattr(e, 'reason', 'N/A') # Or str(e) if reason attribute might be missing
+        # Construct the detailed message for the HTTPException (using original logic)
+        status_code_val = getattr(e, 'status_code', api_status_code) # Use extracted code if direct attribute missing
+        reason_val = getattr(e, 'reason', 'N/A')
         url_val = getattr(e, 'url', 'N/A')
         text_val = getattr(e, 'text', 'N/A')
-        
-        # Ensure reason_val is a simple string, not the full formatted message if str(e) is complex
-        if hasattr(e, 'reason') and e.reason: # Prioritize .reason if available
-            simple_reason = e.reason
-        else: # Fallback if .reason is not set or empty
-            simple_reason = str(e).split('\n')[0] # Try to get first line if str(e) is multi-line
 
-        # The detail string format expected by the tests:
+        if hasattr(e, 'reason') and e.reason:
+            simple_reason = e.reason
+        else:
+            simple_reason = str(e).split('\n')[0]
+
         detail_str = f"Error creating page in Confluence: Details: Received {status_code_val} {simple_reason} for url: {url_val}\nResponse: {text_val}"
 
         # Re-raise as HTTPException for FastAPI to handle
@@ -438,8 +445,11 @@ async def update_page_logic(
                     logger.debug(f"DEBUG: Fetched space_key='{fetched_space_key}' during initial get_page_by_id.")
 
             except ApiError as e:
-                 # Fix ApiError handling (status code and reason)
-                 api_status_code = e.status_code if hasattr(e, 'status_code') and e.status_code is not None else 500
+                 # Correctly extract status code from e.response
+                 api_status_code = 500 # Default
+                 if hasattr(e, 'response') and e.response is not None and hasattr(e.response, 'status_code'):
+                     api_status_code = e.response.status_code
+
                  api_reason = str(e)
                  logger.error(f"ERROR: API error fetching page {inputs.page_id} for update: {api_status_code} - {api_reason}")
                  if api_status_code == 404:
@@ -525,8 +535,11 @@ async def update_page_logic(
                  raise HTTPException(status_code=500, detail=detail_msg) from val_err
 
         except ApiError as e:
-            # Correctly access status code directly from ApiError
-            api_status_code = e.status_code if hasattr(e, 'status_code') and e.status_code is not None else 500
+            # Correctly extract status code from e.response
+            api_status_code = 500 # Default
+            if hasattr(e, 'response') and e.response is not None and hasattr(e.response, 'status_code'):
+                api_status_code = e.response.status_code
+
             api_reason = str(e)
             logger.error(f"API error during page update for page_id {inputs.page_id}: Status {api_status_code}, Reason: {api_reason}")
             raise HTTPException(status_code=api_status_code, detail=f"Error interacting with Confluence API: {api_reason}")
@@ -537,23 +550,28 @@ async def update_page_logic(
             raise HTTPException(status_code=500, detail=f"Unexpected error updating page. Details: {str(e)}")
 
     except ApiError as e:
-        # Fix ApiError handling (status code and reason)
-        api_status_code = e.status_code if hasattr(e, 'status_code') and e.status_code is not None else 500
-        api_reason = str(e)
-        logger.error(f"ERROR: Confluence API error during page update: {api_status_code} - {api_reason}")
-        # Determine appropriate status code based on Confluence error if possible
-        status_code = 500 # Default to internal server error
-        if api_status_code == 400:
-            status_code = 400 # Bad Request (e.g., invalid parent_id, malformed body)
-        elif api_status_code == 403:
-            status_code = 403 # Forbidden (permissions)
-        elif api_status_code == 404:
-             status_code = 404 # Not Found (e.g., space_key not found)
-        elif api_status_code == 409:
-            status_code = 409 # Conflict updating page (e.g., incorrect current_version_number)
+        # Correctly extract status code from e.response
+        api_status_code = 500 # Default
+        if hasattr(e, 'response') and e.response is not None and hasattr(e.response, 'status_code'):
+            api_status_code = e.response.status_code
 
-        logger.error(f"ERROR: Confluence API error during page update: {api_status_code} - {api_reason}")
-        raise HTTPException(status_code=status_code, detail=f"Error updating page in Confluence: API_STATUS={api_status_code}, CALC_STATUS={status_code}, Details: {api_reason}") from e
+        api_reason = str(e)
+        # Determine the appropriate status code for the HTTPException
+        # Use the extracted API status code if it's a client error (4xx) or specific server errors we handle (like 409 conflict)
+        # Otherwise, default to 503 Service Unavailable for general API issues
+        http_status_code = 503 # Default to Service Unavailable for API errors
+        if 400 <= api_status_code < 500:
+            http_status_code = api_status_code
+        elif api_status_code == 503:
+             http_status_code = 503 # Explicitly keep 503 if API returned it
+
+        logger.error(f"ERROR: Confluence API error during page update: {api_status_code} - {api_reason}. Raising HTTPException with status {http_status_code}")
+        # Construct detail message
+        detail_message = f"Error updating page {inputs.page_id} in Confluence: Details: {api_reason}"
+        # Optionally add more context if needed, e.g. API status code
+        # detail_message += f" (API Status: {api_status_code})"
+
+        raise HTTPException(status_code=http_status_code, detail=detail_message) from e
 
     except HTTPException as http_exc: # Re-raise HTTPExceptions raised internally
          logger.debug(f"DEBUG: Re-raising HTTPException from update_page_logic: {http_exc.status_code} - {http_exc.detail}")

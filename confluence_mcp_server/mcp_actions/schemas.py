@@ -289,3 +289,39 @@ class UpdatePageOutput(BaseModel):
 
 
 # --- Get Comments Schemas ---
+
+class GetCommentsInput(BaseModel):
+    """
+    Input schema for the get_comments tool.
+    """
+    page_id: str = Field(..., description="The ID of the Confluence page to retrieve comments from.", examples=["12345"])
+    limit: Optional[int] = Field(25, description="Maximum number of comments to return. Default is 25.", gt=0, examples=[10])
+    start: Optional[int] = Field(0, description="Starting index for pagination (0-based). Default is 0.", ge=0, examples=[0])
+    expand: Optional[str] = Field(None, description="A comma-separated list of properties to expand on the comment object (e.g., 'history', 'version', 'body.view').", examples=["body.view,version"])
+
+class CommentOutputItem(BaseModel):
+    """
+    Represents a single Confluence comment.
+    """
+    comment_id: str = Field(..., description="The ID of the comment.")
+    author_id: Optional[str] = Field(None, description="The account ID of the comment author. May require specific 'expand' options on the API call.")
+    author_display_name: Optional[str] = Field(None, description="The display name of the comment author.")
+    created_date: str = Field(..., description="The date and time the comment was created (ISO 8601 format).")
+    last_updated_date: Optional[str] = Field(None, description="The date and time the comment was last updated (ISO 8601 format).")
+    body_storage: Optional[str] = Field(None, description="The content of the comment in Confluence Storage Format. Requires 'body.storage' or similar in expand.")
+    body_view: Optional[str] = Field(None, description="The content of the comment in HTML view format. Requires 'body.view' or similar in expand.")
+    parent_comment_id: Optional[str] = Field(None, description="If this comment is a reply, the ID of the parent comment.")
+
+class GetCommentsOutput(BaseModel):
+    """
+    Output schema for the get_comments tool.
+    """
+    comments: List[CommentOutputItem] = Field(..., description="A list of Confluence comments.")
+    retrieved_count: int = Field(..., description="The number of comments returned in this response.")
+    total_available: Optional[int] = Field(None, description="The total number of comments available on the page (if known from API response).")
+    next_start_offset: Optional[int] = Field(None, description="The starting index for the next set of results, if more are available. Null if no more comments.")
+    limit_used: int = Field(..., description="The limit parameter value used for this request.")
+    start_used: int = Field(..., description="The start parameter value used for this request.")
+
+
+# Tool Registry (Example structure, adapt as needed)

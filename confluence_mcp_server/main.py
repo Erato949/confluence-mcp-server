@@ -1,9 +1,10 @@
 import os
-from fastapi import FastAPI, HTTPException, Body, APIRouter
+from fastapi import FastAPI, HTTPException, Body, APIRouter, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional, Union
 from atlassian import Confluence
+from atlassian.errors import ApiError
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 import json
@@ -28,10 +29,13 @@ from .mcp_actions.schemas import (
     CreatePageOutput,
     UpdatePageInput, 
     UpdatePageOutput, 
+    GetCommentsInput, # Added for get_comments tool
+    GetCommentsOutput, # Added for get_comments tool
 )
 # Import tool logic
 from .mcp_actions.space_actions import get_spaces_logic
 from .mcp_actions.page_actions import get_page_logic, search_pages_logic, create_page_logic, update_page_logic
+from .mcp_actions.comment_actions import get_comments_logic # Added for get_comments tool
 
 # Load environment variables from .env file
 load_dotenv()
@@ -101,6 +105,45 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# --- ADD CUSTOM EXCEPTION HANDLER for ApiError ---
+@app.exception_handler(ApiError)
+async def api_error_handler(request: Request, exc: ApiError):
+    """
+    Handles ApiError specifically to return a structured error response
+    before the generic Starlette handler or endpoint handler processes it.
+    """
+    status = getattr(exc, 'status_code', 500) # Default to 500 if not present
+    reason = getattr(exc, 'reason', 'Unknown API Error Reason')
+    url = getattr(exc, 'url', 'N/A')
+
+    # Attempt to determine the tool_name from the request body if possible
+    tool_name_guess = "unknown tool" # Placeholder
+    try:
+        # This might fail if the request body isn't valid JSON or doesn't have the key
+        if request.headers.get("content-type") == "application/json":
+             body = await request.json()
+             tool_name_guess = body.get("tool_name", "unknown tool")
+    except Exception:
+        pass # Ignore errors getting tool name here, proceed with placeholder
+
+    error_detail = f"Confluence API Error in tool '{tool_name_guess}': Status {status}, Reason: {reason}, URL: {url}"
+
+    error_payload = MCPExecuteResponse(
+        tool_name=tool_name_guess,
+        status="error",
+        error_message=error_detail,
+        error_type="ApiError" # More specific type than ToolLogicError
+    ).model_dump(exclude_none=False)
+
+    # Use the API status code if it seems like a client/server error (4xx/5xx), otherwise default to 500
+    response_status_code = status if 400 <= status < 600 else 500
+
+    return JSONResponse(
+        status_code=response_status_code,
+        content=error_payload,
+    )
+# --- END CUSTOM EXCEPTION HANDLER ---
+
 # --- In-memory store for tool definitions ---
 AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {}
 
@@ -147,6 +190,14 @@ def load_tools():
         "input_schema": UpdatePageInput,
         "output_schema": UpdatePageOutput,
         "logic": update_page_logic
+    }
+
+    # Get Comments Tool Definition
+    AVAILABLE_TOOLS['get_comments'] = {
+        "description": "Retrieves comments for a specific Confluence page.",
+        "input_schema": GetCommentsInput,
+        "output_schema": GetCommentsOutput,
+        "logic": get_comments_logic
     }
 
     print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")
@@ -258,22 +309,41 @@ async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
         return response
 
     except HTTPException as http_exc: 
+        # Log the error with traceback for debugging
+        logger.exception(f"HTTP exception in tool {tool_name}: Status {http_exc.status_code}")
         error_payload = MCPExecuteResponse(
             tool_name=tool_name,
             status="error",
-            error_message=http_exc.detail, # Use detail directly
-            error_type=type(http_exc).__name__ 
+            error_message=str(http_exc.detail), # Use the detail from the HTTPException
+            error_type="HTTPException"
         ).model_dump(exclude_none=False)
         return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-    except Exception as e: 
+
+    except Exception as e:
+        # --- MODIFIED Generic Error Handling ---
+        error_detail_str = ""
+        if isinstance(e, HTTPException):
+            # Prioritize the detail from HTTPException if available and convert to string
+            error_detail_str = str(getattr(e, 'detail', str(e))) # Use str(e) as fallback if detail missing
+        else:
+            # Otherwise, use the default string representation
+            error_detail_str = str(e)
+
+        # Construct the final message using the extracted detail string
+        error_message = f"An unexpected error occurred in tool '{tool_name}': {error_detail_str}"
+        logger.exception(f"Generic error in tool {tool_name}: {error_message}") # Log the formatted message
+
         error_payload = MCPExecuteResponse(
             tool_name=tool_name,
             status="error",
-            error_message=f"An unexpected error occurred in tool '{tool_name}': {str(e)}",
-            error_type="ToolLogicError"
+            error_message=error_message, # Use the safely formatted message
+            error_type="ToolLogicError" # Keep as ToolLogicError for generic catches
         ).model_dump(exclude_none=False)
         return JSONResponse(content=error_payload, status_code=500)
+        # --- END MODIFIED Generic Error Handling ---
 
+
+# Include the router AFTER defining the app and the handler
 app.include_router(router)
 
 # --- Main entry point for Uvicorn (if running directly) ---
