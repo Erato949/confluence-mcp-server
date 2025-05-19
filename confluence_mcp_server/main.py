@@ -1,368 +1,275 @@
 import os
-from fastapi import FastAPI, HTTPException, Body, APIRouter, Request
-from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-from typing import List, Dict, Any, Optional, Union
-from atlassian import Confluence
-from atlassian.errors import ApiError
-from pydantic import ValidationError
-from pydantic_core import ErrorDetails
-import json
 import logging
+from dotenv import load_dotenv
+import types
 
-# Initialize logger
-logger = logging.getLogger(__name__)
+# FastAPI imports
+from fastapi import FastAPI, Request # Added Request for app.state access (though not strictly needed for app.state)
+from starlette.applications import Starlette 
 
-# Import schemas from the mcp_actions package
-from .mcp_actions.schemas import (
-    MCPToolSchema,
-    MCPListToolsResponse,
-    MCPExecuteRequest,
-    MCPExecuteResponse,
-    GetSpacesInput,
-    GetSpacesOutput,
-    GetPageInput, 
-    GetPageOutput,
-    SearchPagesInput,
-    SearchPagesOutput,
-    CreatePageInput,
-    CreatePageOutput,
-    UpdatePageInput, 
-    UpdatePageOutput, 
-    GetCommentsInput, 
-    GetCommentsOutput, 
-    DeletePageInput, 
-    DeletePageOutput, 
-    AddCommentInput,  
-    AddCommentOutput,
-    GetAttachmentsInput, 
-    AttachmentOutputItem, 
-    GetAttachmentsOutput,
-    AddAttachmentInput, 
-    AddAttachmentOutput,
-)
-# Import tool logic
-from .mcp_actions.space_actions import get_spaces_logic
-from .mcp_actions.page_actions import get_page_logic, create_page_logic, update_page_logic, delete_page_logic, search_pages_logic
-from .mcp_actions.comment_actions import get_comments_logic, add_comment_logic
-from .mcp_actions.attachment_actions import get_attachments_logic, add_attachment_logic
+# MCP and FastMCP imports
+from mcp.server.fastmcp import FastMCP, Context # Reverted to use FastMCP from package __init__
+from mcp.types import Tool # Changed from ToolSpec, Source, MessagesInput, MessagesOutput
 
-# Load environment variables from .env file
+from contextlib import asynccontextmanager
+from functools import partial
+# from starlette.applications import Starlette # Redundant import
+from typing import AsyncGenerator, Optional
+
+# Local project imports
+from confluence_mcp_server.utils.logging_config import setup_logging
+
+# Load environment variables FIRST
 load_dotenv()
 
-# --- Confluence Client Initialization ---
-CONFLUENCE_URL = os.getenv("CONFLUENCE_URL")
-CONFLUENCE_USERNAME = os.getenv("CONFLUENCE_USERNAME")
-CONFLUENCE_API_KEY = os.getenv("CONFLUENCE_API_KEY")
+# Configure logging
+setup_logging(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-confluence_client: Optional[Confluence] = None
+logger.info("Confluence MCP Server starting up...")
 
-if CONFLUENCE_URL and CONFLUENCE_USERNAME and CONFLUENCE_API_KEY:
-    try:
-        confluence_client = Confluence(
-            url=CONFLUENCE_URL,
-            username=CONFLUENCE_USERNAME,
-            password=CONFLUENCE_API_KEY, 
-            cloud=True 
-        )
-        print("Successfully initialized Confluence client.")
+@asynccontextmanager
+async def actual_root_app_lifespan(app: FastAPI): # app is root_app
+    print("--- DEBUG PRINT: Entering actual_root_app_lifespan (startup) ---", flush=True)
+    logger.info("Actual Root App Lifespan: Startup sequence initiated.")
+    
+    global tool_manager # Ensure tool_manager is accessible
+    # tool_manager should have been initialized and populated by lines ~120-148
+    if tool_manager is None:
+        print("--- DEBUG PRINT: CRITICAL - tool_manager is None in lifespan. This indicates an initialization order problem. ---", flush=True)
+        logger.critical("tool_manager is None within actual_root_app_lifespan. Aborting lifespan setup for MCP.")
+        # If tool_manager is critical and not set, we might not want to proceed with MCP part
+        yield # Allow root_app to proceed without MCP if tool_manager is missing
+        print("--- DEBUG PRINT: Exiting actual_root_app_lifespan (shutdown) due to missing tool_manager. ---", flush=True)
+        return
 
-        # --- Test Confluence Connection ---
-        try:
-            print(f"Attempting a basic API call to Confluence (listing 1 space)...")
-            # Use get_all_spaces(limit=1) as a basic connectivity test
-            spaces = confluence_client.get_all_spaces(limit=1)
-            
-            if spaces is not None: # Check if the call returned something (even an empty list for 'results' is a success)
-                # The structure of `spaces` is typically a dict with a 'results' list.
-                # We are just checking if the API call itself succeeded without an auth error.
-                print(f"Successfully connected to Confluence and performed a basic API call.")
-                # You can inspect `spaces` if needed: print(f"Spaces data: {spaces}")
-            else:
-                # This case might indicate an issue if get_all_spaces returns None on error,
-                # though it usually raises an exception for auth/connection errors.
-                print(f"Basic Confluence API call (get_all_spaces) returned None. Check permissions or instance status.")
+    print(f"--- DEBUG PRINT: Using tool_manager: {type(tool_manager)} in lifespan. Tools: {len(tool_manager._tools) if hasattr(tool_manager, '_tools') and tool_manager._tools else 'None'}", flush=True)
 
-        except Exception as conn_test_e:
-            print(f"Confluence client initialized, but basic connection test (get_all_spaces) failed: {conn_test_e}")
-            # This is where we'd likely catch authentication or network errors.
-            print("Please check your Confluence URL, credentials, API key permissions (e.g., view spaces), and network connectivity.")
-            # Depending on desired behavior, you might set confluence_client to None here if a successful test is mandatory.
-            # confluence_client = None 
-            
-    except Exception as e:
-        print(f"Error initializing Confluence client: {e}")
-        confluence_client = None
-else:
-    print("Confluence credentials not found in environment variables. Confluence client not initialized.")
+    local_mcp_server_instance = FastMCP(
+        title="Confluence MCP Server - via FastMCP",
+        description="MCP server using FastMCP and its streamable_http_app transport.",
+        version="0.1.0",
+        tool_manager=tool_manager, 
+        context_model=Context,
+        logger=logger, # Pass the main logger
+    )
+    
+    global mcp_server_instance # Allows mcp_server_instance to be potentially inspected, though its primary role is reduced
+    mcp_server_instance = local_mcp_server_instance
+    print(f"--- DEBUG PRINT: local_mcp_server_instance ({type(local_mcp_server_instance)}) created in lifespan and assigned to global mcp_server_instance. ---", flush=True)
+    
+    # Get the transport app from FastMCP
+    # The streamable_http_app() method seems to return a Starlette app directly in this version.
+    # It might be an async method or a regular method.
+    
+    returned_item = local_mcp_server_instance.streamable_http_app()
+    print(f"--- DEBUG PRINT: local_mcp_server_instance.streamable_http_app() returned: {type(returned_item)} ---", flush=True)
 
-def get_confluence_client() -> Confluence:
-    """
-    Returns the initialized Confluence client.
-    Raises an HTTPException if the client is not available.
-    """
-    if confluence_client is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="Confluence client is not initialized. Check server configuration and .env file."
-        )
-    return confluence_client
+    transport_app_for_state = None
+    if hasattr(returned_item, '__await__'): # Check if it's a coroutine
+        print("--- DEBUG PRINT: streamable_http_app() result is awaitable. Awaiting it. ---", flush=True)
+        transport_app_for_state = await returned_item
+    else: # If not awaitable, assume it's the app instance directly
+        print("--- DEBUG PRINT: streamable_http_app() result is NOT awaitable. Using as is. ---", flush=True)
+        transport_app_for_state = returned_item
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Confluence MCP Server",
-    description="A local MCP server for interacting with Confluence.",
-    version="0.1.0"
+    print(f"--- DEBUG PRINT: Final transport app to assign to state is: {type(transport_app_for_state)} ---", flush=True)
+    
+    # Check if we actually got a Starlette app before trying to use it.
+    if transport_app_for_state.__class__.__name__ == 'Starlette':
+        app.state.mcp_app_to_mount = transport_app_for_state
+        logger.info(f"MCP transport app ({type(app.state.mcp_app_to_mount)}) obtained and set to app.state.mcp_app_to_mount.")
+    else:
+        logger.error(f"FastMCP.streamable_http_app() did not return a Starlette app. Got: {type(transport_app_for_state)}. MCP server cannot be mounted.")
+        app.state.mcp_app_to_mount = None # Ensure it's None if not a Starlette app
+
+    # --- MOUNTING LOGIC MOVED FROM STARTUP EVENT HANDLER ---
+    print("--- DEBUG PRINT: Lifespan: Attempting to mount MCP app. ---", flush=True)
+    logger.info("Lifespan: Attempting to mount MCP app.")
+    # Check if mcp_app_to_mount was set by the lifespan function
+    if hasattr(app.state, 'mcp_app_to_mount') and app.state.mcp_app_to_mount is not None:
+        mcp_app_resolved = app.state.mcp_app_to_mount
+        print(f"--- DEBUG PRINT: Lifespan: Mounting mcp_app ({type(mcp_app_resolved)}) to app at /mcp_server. ---", flush=True)
+        # The name argument for mount is important if you ever need to refer to this mount, e.g., for unmounting or routing.
+        app.mount("/mcp_server", mcp_app_resolved, name="mcp_server_transport") # Using 'app' here
+        logger.info(f"Lifespan: MCP app ({type(mcp_app_resolved).__name__}) mounted at /mcp_server.")
+        
+        # Diagnostic print of routes after mount
+        route_info = []
+        print("--------------------------------------------------")
+        print("DIAGNOSTIC: Routes in app (after MCP app mount in lifespan)")
+        for route in app.routes: # Using 'app' here
+            if hasattr(route, "path"):
+                path = route.path
+                name = route.name if hasattr(route, "name") else "N/A"
+                methods = route.methods if hasattr(route, "methods") else "N/A"
+                route_info.append(f"  Path: {path}, Name: {name}, Methods: {methods}")
+            elif isinstance(route, Mount):
+                mount_path = route.path
+                mounted_app_type = type(route.app).__name__
+                route_info.append(f"  Mount Path: {mount_path}, App: {mounted_app_type}")
+        print("\n".join(route_info))
+        print("--------------------------------------------------", flush=True)
+    else:
+        print("--- DEBUG PRINT: Lifespan: No mcp_app_to_mount available in app.state. MCP server not mounted. ---", flush=True)
+        logger.error("Lifespan: No app found in app.state.mcp_app_to_mount. MCP server not mounted.")
+    # --- END OF MOVED MOUNTING LOGIC ---
+
+    if mcp_server_instance and mcp_server_instance._session_manager:
+        logger.info("--- DEBUG PRINT: Entering session_manager.run() context to make application operational ---")
+        async with mcp_server_instance._session_manager.run():
+            # The MCP app (if any) should have already been mounted from app.state before this block.
+            # No need to check a local mcp_app_to_mount or re-mount here.
+            logger.info("--- DEBUG PRINT: About to yield in actual_root_app_lifespan (operational phase) INSIDE session_manager.run() ---")
+            yield  # Application is operational
+            logger.info("--- DEBUG PRINT: Returned from yield in actual_root_app_lifespan (shutdown phase) INSIDE session_manager.run() ---")
+            # Shutdown logic related to session_manager is handled by its own context exit
+    else:
+        # Fallback if session_manager isn't available or mcp_server_instance is None
+        logger.warning("Lifespan: MCP server instance or its session manager not available for session_manager.run() context. Proceeding without it.")
+        logger.info("--- DEBUG PRINT: About to yield in actual_root_app_lifespan (operational phase) - FALLBACK PATH (no session_manager context) ---")
+        yield # Application is operational (potentially with issues if session_manager was critical for the mounted app)
+        logger.info("--- DEBUG PRINT: Returned from yield in actual_root_app_lifespan (shutdown phase) - FALLBACK PATH (no session_manager context) ---")
+
+    # General shutdown logic here (outside session_manager.run if it was used)
+    logger.info("Lifespan: Shutdown sequence initiated.")
+    if mcp_server_instance and hasattr(mcp_server_instance, 'close') and callable(mcp_server_instance.close):
+        # Assuming close is an async method if it exists; typical for server resources
+        # Check if it's an async function if unsure
+        # For now, let's assume it could be sync or async, or may not exist for FastMCP
+        # FastMCP itself doesn't define a close(), but its underlying MCPServer might, or transports.
+        # The session_manager.run() handles its own cleanup.
+        logger.info("Lifespan: mcp_server_instance specific close() if any, would be called here if needed.") 
+    if hasattr(app.state, 'mcp_app_to_mount') and app.state.mcp_app_to_mount is not None:
+        logger.info(f"Root app has resumed from yield. MCP transport app ({type(app.state.mcp_app_to_mount)}) was active.")
+    else:
+        logger.info("Root app has resumed from yield. No MCP transport app was active or set in app.state.")
+
+    app.state.mcp_app_to_mount = None # Clear the reference after the context has exited
+    mcp_server_instance = None # Clear the global instance as well
+    logger.info("Actual Root App Lifespan: Shutdown sequence completed.")
+    print("--- DEBUG PRINT: Exiting actual_root_app_lifespan (shutdown) ---", flush=True)
+
+# Create the main FastAPI app (root app)
+root_app = FastAPI(
+    title="Confluence MCP Server - Root",
+    description="Main FastAPI application hosting health checks and MCP server.",
+    version="0.1.0",
+    lifespan=actual_root_app_lifespan
 )
 
-# --- ADD CUSTOM EXCEPTION HANDLER for ApiError ---
-@app.exception_handler(ApiError)
-async def api_error_handler(request: Request, exc: ApiError):
-    """
-    Handles ApiError specifically to return a structured error response
-    before the generic Starlette handler or endpoint handler processes it.
-    """
-    status = getattr(exc, 'status_code', 500) # Default to 500 if not present
-    reason = getattr(exc, 'reason', 'Unknown API Error Reason')
-    url = getattr(exc, 'url', 'N/A')
 
-    # Attempt to determine the tool_name from the request body if possible
-    tool_name_guess = "unknown tool" # Placeholder
-    try:
-        # This might fail if the request body isn't valid JSON or doesn't have the key
-        if request.headers.get("content-type") == "application/json":
-             body = await request.json()
-             tool_name_guess = body.get("tool_name", "unknown tool")
-    except Exception:
-        pass # Ignore errors getting tool name here, proceed with placeholder
 
-    error_detail = f"Confluence API Error in tool '{tool_name_guess}': Status {status}, Reason: {reason}, URL: {url}"
+# Initialize mcp_app_to_mount on app.state so it's available when lifespan runs
+root_app.state.mcp_app_to_mount = None 
+print("--- DEBUG PRINT: root_app created, root_app.state.mcp_app_to_mount initialized to None. ---", flush=True)
 
-    error_payload = MCPExecuteResponse(
-        tool_name=tool_name_guess,
-        status="error",
-        error_message=error_detail,
-        error_type="ApiError" # More specific type than ToolLogicError
-    ).model_dump(exclude_none=False)
+# --- Health Check Endpoint on Root App ---
+@root_app.get("/health", tags=["Health"])
+async def health_check():
+    return {"status": "ok"}
 
-    # Use the API status code if it seems like a client/server error (4xx/5xx), otherwise default to 500
-    response_status_code = status if 400 <= status < 600 else 500
+# --- Tool Definitions (Example) ---
+# mcp.types should provide ToolSpec, Source, MessagesInput, MessagesOutput
+from pydantic import BaseModel, Field
 
-    return JSONResponse(
-        status_code=response_status_code,
-        content=error_payload,
-    )
-# --- END CUSTOM EXCEPTION HANDLER ---
+class AddInput(BaseModel):
+    x: int = Field(..., description="First number")
+    y: int = Field(..., description="Second number")
 
-# --- In-memory store for tool definitions ---
-AVAILABLE_TOOLS: Dict[str, Dict[str, Any]] = {
-    "get_page": {
-        "description": "Retrieves details of a specific Confluence page by its ID, or by space key and title.",
-        "input_schema": GetPageInput,
-        "output_schema": GetPageOutput,
-        "logic": get_page_logic
+class AddOutput(BaseModel):
+    result: int = Field(..., description="Sum of x and y")
+
+async def add_logic(context: Context, inputs: AddInput) -> AddOutput:
+    print(f"--- DEBUG PRINT: add_logic called with inputs: {inputs} ---", flush=True)
+    logger.info(f"Executing 'add_logic' with x={inputs.x}, y={inputs.y}")
+    result = inputs.x + inputs.y
+    return AddOutput(result=result)
+
+AVAILABLE_TOOLS = {
+    "Add": {
+        "tool_spec": Tool(
+            name="Add",
+            description="Adds two numbers.",
+            # source=Source(module=__name__, function_name="add_logic"), # 'source' not in mcp.types.Tool
+            inputSchema=AddInput.model_json_schema(), # Using model_json_schema()
+            responseSchema=AddOutput.model_json_schema(), # Using model_json_schema()
+        ),
+        "logic": add_logic,
     },
-    "search_pages": {
-        "description": "Searches for Confluence pages using CQL (Confluence Query Language) or a simple query string.",
-        "input_schema": SearchPagesInput,
-        "output_schema": SearchPagesOutput,
-        "logic": search_pages_logic
-    },
-    "get_spaces": {
-        "description": "Retrieves a list of Confluence spaces, with optional filtering.",
-        "input_schema": GetSpacesInput,
-        "output_schema": GetSpacesOutput,
-        "logic": get_spaces_logic
-    },
-    "create_page": {
-        "description": "Creates a new Confluence page.",
-        "input_schema": CreatePageInput,
-        "output_schema": CreatePageOutput,
-        "logic": create_page_logic
-    },
-    "update_page": {
-        "description": "Updates an existing Confluence page.",
-        "input_schema": UpdatePageInput,
-        "output_schema": UpdatePageOutput,
-        "logic": update_page_logic
-    },
-    "delete_page": {
-        "description": "Deletes a Confluence page. This is a permanent action.",
-        "input_schema": DeletePageInput,
-        "output_schema": DeletePageOutput,
-        "logic": delete_page_logic
-    },
-    "get_comments": {
-        "description": "Retrieves comments for a specific Confluence page.",
-        "input_schema": GetCommentsInput,
-        "output_schema": GetCommentsOutput,
-        "logic": get_comments_logic
-    },
-    "add_comment": {
-        "description": "Adds a new comment to a Confluence page.",
-        "input_schema": AddCommentInput,
-        "output_schema": AddCommentOutput,
-        "logic": add_comment_logic
-    },
-    "get_attachments": {
-        "description": "Retrieves a list of attachments for a specified Confluence page.",
-        "input_schema": GetAttachmentsInput,
-        "output_schema": GetAttachmentsOutput,
-        "logic": get_attachments_logic
-    },
-    "Add-Attachment": {
-        "description": "Adds an attachment to a specified Confluence page from a local file.",
-        "input_schema": AddAttachmentInput,
-        "output_schema": AddAttachmentOutput,
-        "logic": add_attachment_logic
-    }
 }
 
-# Call load_tools at startup to populate AVAILABLE_TOOLS
-print(f"Registered tools: {list(AVAILABLE_TOOLS.keys())}")
+class ToolManager:
+    def __init__(self, available_tools):
+        self._tools = available_tools
+        print(f"--- DEBUG PRINT: ToolManager initialized with tools: {list(self._tools.keys())} ---", flush=True)
+        logger.info(f"ToolManager initialized with tools: {list(self._tools.keys())}")
 
-# --- API Endpoints ---
-router = APIRouter()
+    def get_tool_spec(self, tool_name: str) -> Tool: # Changed return type to Tool
+        print(f"--- DEBUG PRINT: ToolManager.get_tool_spec called for: {tool_name} ---", flush=True)
+        if tool_name not in self._tools:
+            logger.error(f"Tool '{tool_name}' not found in ToolManager.")
+            raise ValueError(f"Tool '{tool_name}' not found")
+        spec = self._tools[tool_name]["tool_spec"]
+        logger.debug(f"Retrieved spec for tool '{tool_name}': {spec.name}")
+        return spec
 
-@app.get("/health", status_code=200)
-async def health_check():
-    client_status = "initialized" if confluence_client else "not_initialized"
-    return {"status": "ok", "message": "Confluence MCP Server is running", "confluence_client_status": client_status}
+    def get_tool_logic(self, tool_name: str):
+        print(f"--- DEBUG PRINT: ToolManager.get_tool_logic called for: {tool_name} ---", flush=True)
+        if tool_name not in self._tools:
+            logger.error(f"Tool logic for '{tool_name}' not found in ToolManager.")
+            raise ValueError(f"Tool logic for '{tool_name}' not found")
+        logic = self._tools[tool_name]["logic"]
+        logger.debug(f"Retrieved logic for tool '{tool_name}': {getattr(logic, '__name__', type(logic).__name__)}")
+        return logic
 
-def make_errors_json_serializable(errors: list[ErrorDetails]) -> list[dict]:
-    """Converts Pydantic's ErrorDetails list into a JSON-serializable format.
+    def list_tools(self) -> list[Tool]: # Changed return type to list[Tool]
+        print("--- DEBUG PRINT: ToolManager.list_tools called ---", flush=True)
+        specs = [data["tool_spec"] for data in self._tools.values()]
+        logger.info(f"Listing available tools: {len(specs)} found.")
+        return specs
 
-    Handles non-serializable types often found in validation contexts,
-    like exception objects or complex inputs, by converting them to strings.
-    """
-    serializable_list = []
-    if not isinstance(errors, list):
-        # Handle cases where errors might not be a list as expected
-        return [{'msg': 'Invalid error format received.'}]
-        
-    for error in errors:
-        # Ensure error is a dictionary before processing
-        if not isinstance(error, dict):
-            serializable_list.append({'msg': f'Non-dict error item encountered: {type(error)}'})
-            continue
-            
-        serializable_error = {} 
-        for key, value in error.items():
-            try:
-                # Attempt a simple JSON check - this is basic but covers common cases
-                json.dumps({key: value})
-                serializable_error[key] = value
-            except (TypeError, OverflowError):
-                # If standard serialization fails, convert to string
-                # Special handling for 'loc' which should be a tuple of strings/ints
-                if key == 'loc' and isinstance(value, (list, tuple)):
-                     serializable_error[key] = tuple(str(loc_item) for loc_item in value)
-                # Convert anything else problematic to its string representation
-                else:
-                    serializable_error[key] = str(value)
-                    
-        serializable_list.append(serializable_error)
-    return serializable_list
+tool_manager = ToolManager(AVAILABLE_TOOLS)
 
-@router.post("/execute", response_model=MCPExecuteResponse, response_model_exclude_none=True)
-async def execute_tool_endpoint(request: MCPExecuteRequest = Body(...)):
-    tool_name = request.tool_name
-    inputs = request.inputs or {}
-    tool_info = AVAILABLE_TOOLS.get(tool_name)
+# --- FastMCP Server Instance Creation ---
+fastapi_for_mcp = FastAPI(
+    title="Confluence MCP Server - Tools Sub-App",
+    description="FastAPI app for MCP tools, managed by FastMCP.",
+    # Lifespan for this app (if any) should be set up by FastMCP internally if it needs one
+    # for managing its own tool routes or other internal state. We are not setting it here.
+)
+print(f"--- DEBUG PRINT: fastapi_for_mcp instance created: {type(fastapi_for_mcp)} ---", flush=True)
 
-    if not tool_info:
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="error",
-            error_message=f"Tool '{tool_name}' is not recognized or not available.",
-            error_type="ToolNotFoundError"
-        ).model_dump(exclude_none=False)
-        return JSONResponse(content=error_payload, status_code=404)
+# json_rpc_transport_factory and StreamableHttpTransport are no longer needed as
+# FastMCP.from_fastapi will use its default streamable_http_app transport.
 
-    logic_function = tool_info.get('logic')
-    input_schema_class = tool_info.get('input_schema')
-
-    if not logic_function or not input_schema_class:
-        # This case indicates an internal configuration error
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="error",
-            error_message=f"Internal configuration error for tool '{tool_name}': Missing logic or input schema.",
-            error_type="ConfigurationError"
-        ).model_dump(exclude_none=False)
-        return JSONResponse(content=error_payload, status_code=500)
-
-    try:
-        parsed_inputs = input_schema_class.model_validate(inputs)
-    except ValidationError as e:
-        serializable_errors = make_errors_json_serializable(e.errors())
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="error",
-            error_message="Input validation failed.",
-            error_type="InputValidationError",
-            validation_details=serializable_errors # Use the sanitized errors
-        ).model_dump(exclude_none=False)
-        return JSONResponse(content=error_payload, status_code=422)
-
-    try:
-        client = get_confluence_client()
-        tool_output_model = await logic_function(client=client, inputs=parsed_inputs)
-        logger.debug(f"Logic function {logic_function.__name__} returned: {tool_output_model}")
-
-        # Handle case where logic function returns None (e.g., resource not found)
-        if tool_output_model is None:
-            logger.warning(f"{logic_function.__name__} returned None, raising 404.")
-            raise HTTPException(status_code=404, detail=f"{tool_name} resource not found.")
-
-        # Prepare success response
-        response = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="success",
-            outputs=tool_output_model.model_dump(exclude_none=False) 
-        )
-        return response
-
-    except HTTPException as http_exc: 
-        # Log the error with traceback for debugging
-        logger.exception(f"HTTP exception in tool {tool_name}: Status {http_exc.status_code}")
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="error",
-            error_message=str(http_exc.detail), # Use the detail from the HTTPException
-            error_type="HTTPException"
-        ).model_dump(exclude_none=False)
-        return JSONResponse(content=error_payload, status_code=http_exc.status_code)
-
-    except Exception as e:
-        # --- MODIFIED Generic Error Handling ---
-        error_detail_str = ""
-        if isinstance(e, HTTPException):
-            # Prioritize the detail from HTTPException if available and convert to string
-            error_detail_str = str(getattr(e, 'detail', str(e))) # Use str(e) as fallback if detail missing
-        else:
-            # Otherwise, use the default string representation
-            error_detail_str = str(e)
-
-        # Construct the final message using the extracted detail string
-        error_message = f"An unexpected error occurred in tool '{tool_name}': {error_detail_str}"
-        logger.exception(f"Generic error in tool {tool_name}: {error_message}") # Log the formatted message
-
-        error_payload = MCPExecuteResponse(
-            tool_name=tool_name,
-            status="error",
-            error_message=error_message, # Use the safely formatted message
-            error_type="ToolLogicError" # Keep as ToolLogicError for generic catches
-        ).model_dump(exclude_none=False)
-        return JSONResponse(content=error_payload, status_code=500)
-        # --- END MODIFIED Generic Error Handling ---
+mcp_server_instance: Optional[FastMCP] = None # Reverted to FastMCP type hint
+# app_to_mount is now handled via root_app.state
 
 
-# Include the router AFTER defining the app and the handler
-app.include_router(router, prefix="/tools")
+# Diagnostic print: Inspect routes
+print("-" * 50)
+print("DIAGNOSTIC: Routes in root_app (after potential mount)")
+for route in root_app.routes:
+    route_path = getattr(route, 'path', 'N/A')
+    route_name = getattr(route, 'name', 'N/A')
+    route_methods = getattr(route, 'methods', 'N/A') if hasattr(route, 'methods') else 'N/A (Mount)'
+    print(f"  Path: {route_path}, Name: {route_name}, Methods: {route_methods}")
+    if hasattr(route, 'app') and hasattr(route.app, 'routes') and route_path == '/mcp_server':
+        print(f"    Inspecting routes for Mount at {route_path}:")
+        for sub_route in route.app.routes:
+             sub_route_path = getattr(sub_route, 'path', 'N/A')
+             sub_route_name = getattr(sub_route, 'name', 'N/A')
+             sub_route_methods = getattr(sub_route, 'methods', 'N/A') if hasattr(sub_route, 'methods') else 'N/A (Sub-Mount)'
+             print(f"      Sub-Path: {sub_route_path}, Sub-Name: {sub_route_name}, Sub-Methods: {sub_route_methods}")
+print("-" * 50)
 
-# --- Main entry point for Uvicorn (if running directly) ---
+app = root_app
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True) 
+    APP_PORT = int(os.getenv("PORT", "8000"))
+    APP_HOST = os.getenv("HOST", "0.0.0.0")
+    logger.info(f"Starting Uvicorn to serve 'root_app' on {APP_HOST}:{APP_PORT}")
+    logger.info("MCP server with tools and JSON-RPC transport should be at /mcp_server")
+    uvicorn.run("confluence_mcp_server.main:app", host=APP_HOST, port=APP_PORT, reload=True) # Ensure Uvicorn runs the 'app' from this module

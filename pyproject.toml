@@ -1,4 +1,44 @@
 [tool.pytest.ini_options]
+    pythonpath = ["."]
+    testpaths = ["tests"]
+    addopts = "-p no:django"
+    asyncio_default_fixture_loop_scope = "function"
     filterwarnings = [
         "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning:starlette\\.formparsers"
     ]
+
+[tool.poetry]
+packages = [
+    { include = "confluence_mcp_server" },
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-asyncio = "^0.26.0"
+pytest-cov = "^6.1.1"
+httpx = "^0.28.1"
+black = "^25.1.0"
+flake8 = "^7.2.0"
+mypy = "^1.15.0"
+
+[project]
+name = "confluence-mcp-server-claude"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Erato949",email = "164182664+Erato949@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "fastmcp (>=2.3.4,<3.0.0)",
+    "atlassian-python-api (>=4.0.4,<5.0.0)",
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "fastapi (>=0.110.0,<0.111.0)",
+    "uvicorn[standard] (>=0.29.0,<0.30.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

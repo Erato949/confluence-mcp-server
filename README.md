@@ -24,7 +24,7 @@ Provides the following Confluence actions as MCP tools:
 ## Setup Instructions
 
 1.  **Clone the Repository (if applicable) or Create Project Directory:**
-    Ensure you have all project files in a local directory. Our current working directory is `c:\Users\chris\Documents\Confluence-MCP-Server_Claude\confluence_mcp_server`.
+    Ensure you have all project files in a local directory. The project root directory is `c:\Users\chris\Documents\Confluence-MCP-Server_Claude`.
 
 2.  **Create a Python Virtual Environment:**
     It's highly recommended to use a virtual environment to manage project dependencies.
@@ -65,21 +65,43 @@ Provides the following Confluence actions as MCP tools:
 
 ## Running the Server
 
-Once configured, you can run the MCP server using Uvicorn:
+Once configured, you can run the MCP server using Uvicorn. **Navigate to the project root directory (`c:\Users\chris\Documents\Confluence-MCP-Server_Claude`) in your terminal before running the command.**
 
 ```bash
-uvicorn main:app --reload --port <your_configured_port_or_8000>
+uvicorn confluence_mcp_server.main:app --reload --port <your_configured_port_or_8000>
 ```
-For example, if your `.env` file has `PORT=8080`, you would run:
+For example, if your `.env` file has `PORT=8080`, and you are in the project root directory, you would run:
 ```bash
-uvicorn main:app --reload --port 8080
+uvicorn confluence_mcp_server.main:app --reload --port 8080
 ```
-If no port is specified in `.env`, it defaults to 8000:
+If no port is specified in `.env` (and it defaults to 8000), run from the project root:
 ```bash
-uvicorn main:app --reload
+uvicorn confluence_mcp_server.main:app --reload
 ```
 
 The `--reload` flag enables auto-reloading when code changes are detected, which is useful during development.
+
+## Connecting with Claude Desktop (or other MCP Clients)
+
+Once the Confluence MCP Server is running, you can connect it to MCP-compatible clients like Claude Desktop.
+
+1.  **Ensure the Server is Running:**
+    Follow the "Running the Server" instructions above. By default, the server will be accessible at `http://127.0.0.1:8000` (or `http://localhost:8000`). If you configured a different port in your `.env` file, use that port instead (e.g., `http://127.0.0.1:YOUR_PORT`).
+
+2.  **Configure Your MCP Client (e.g., Claude Desktop):**
+    *   In your MCP client's settings or configuration area where you can add new MCP servers, you will typically need to provide the **Base URL** of this Confluence MCP server.
+    *   Enter the URL from step 1 (e.g., `http://127.0.0.1:8000`).
+    *   **Important:** The server's `/tools` endpoint (e.g., `http://127.0.0.1:8000/tools/`) is what clients use to discover the available Confluence actions. The `/tools/execute` endpoint (e.g., `http://127.0.0.1:8000/tools/execute`) is used to run them. Your client should be configured to use the base URL, and it will append `/tools` or `/tools/execute` as needed based on the MCP specification.
+
+3.  **CORS Configuration:**
+    This Confluence MCP server has been configured with Cross-Origin Resource Sharing (CORS) to allow requests from any origin (`*`). This permissive setting is suitable for local development and connecting with clients like Claude Desktop. For production environments, you might want to restrict the allowed origins.
+
+4.  **Verify Connection:**
+    After adding the server to your MCP client, the client should be able to:
+    *   Discover the available Confluence tools (e.g., `get_page`, `search_pages`, etc.) by querying the `/tools` endpoint.
+    *   Execute these tools by sending requests to the `/tools/execute` endpoint.
+
+Refer to your specific MCP client's documentation for detailed instructions on adding and managing MCP tool servers.
 
 ## Usage
 
@@ -106,3 +128,41 @@ confluence_mcp_server/
 
 ## Contributing
 (Details to be added if this were a collaborative project)
+
+```
+{{ ... }}
+          "CONFLUENCE_API_KEY": "YOUR_CONFLUENCE_API_KEY_HERE",
+          "CONFLUENCE_USERNAME": "YOUR_CONFLUENCE_EMAIL_HERE",
+          "CONFLUENCE_URL": "YOUR_CONFLUENCE_INSTANCE_URL_HERE",
+          "PORT": "8001" // Ensure this matches the port your server is running on
+        }
+      }
+    ]
+  }
+  ```
+
+  **Explanation of Fields:**
+  *   `"name"`: A unique identifier for this MCP server configuration (e.g., `"confluence-mcp-local-dev"`).
+  *   `"command"`: The full path to the Python executable within your project's virtual environment (e.g., `"C:\path\to\your\project\Confluence-MCP-Server_Claude\.venv\Scripts\python.exe"` on Windows or `"/path/to/your/project/Confluence-MCP-Server_Claude/.venv/bin/python"` on Linux/macOS).
+  *   `"args"`: Arguments to pass to the Python interpreter. This should run Uvicorn targeting your FastAPI application.
+      *   `"-m"`, `"uvicorn"`: Tells Python to run the `uvicorn` module.
+      *   `"confluence_mcp_server.main:app"`: The path to your FastAPI application instance.
+      *   `"--host"`, `"127.0.0.1"`: Specifies the host to bind to.
+      *   `"--port"`, `"8001"`: Specifies the port to listen on. **Ensure this matches the `PORT` environment variable set below and is not already in use.**
+      *   `"--reload"`: (Optional) Enables auto-reload for development. Remove for production.
+  *   `"cwd"`: The current working directory for the server process. This should be the root of your `Confluence-MCP-Server_Claude` project directory.
+  *   `"env"`: Environment variables to be set for the server process:
+      *   `"PYTHONPATH"`: **Crucial for ensuring Python can find your `confluence_mcp_server` module.** Set this to the root of your project (e.g., `"C:\path\to\your\project\Confluence-MCP-Server_Claude"`).
+      *   `"CONFLUENCE_URL"`, `"CONFLUENCE_USERNAME"`, `"CONFLUENCE_API_KEY"`: Your Confluence credentials.
+      *   `"PORT"`: The port number the Uvicorn server inside your MCP server will try to use. **This must match the `--port` argument above.**
+
+3.  **Restart Claude Desktop:** After saving the `mcp_servers.json` file, fully restart Claude Desktop for the changes to take effect.
+
+4.  **Connect to the Server:** In Claude Desktop, attempt to connect to the `confluence-mcp-local-dev` (or whatever name you chose) server. You should see logs from your server in the Claude Desktop MCP panel indicating a connection and tool discovery.
+
+### Via Docker (Production/Simplified Deployment)
+
+(Instructions to be added once Dockerfile and docker-compose.yml are finalized in Phase 6)
+
+## Project Structure
+{{ ... }}
