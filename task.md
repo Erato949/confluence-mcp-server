@@ -1,148 +1,123 @@
-# Confluence MCP Server Rebuild: Task List
+# TASK.md - Confluence MCP Server Implementation
 
-This task list outlines the steps to rebuild the Confluence MCP Server using FastMCP.
+## 🎯 PROJECT OVERVIEW
 
-## Phase 1: Setup & Core Infrastructure
+**Project Name**: Confluence MCP Server  
+**Framework**: FastMCP (jlowin/fastmcp)  
+**Purpose**: MCP server providing Confluence integration tools for LLMs  
+**Architecture**: Simplified Direct FastMCP (NO HTTP Proxy, NO Threading)  
 
--   [ ] **Project Structure**: Create the new directory structure as defined in `Product_Technical_Architecture_and_Rebuild_Plan.md` (e.g., `confluence_mcp_server/`, `mcp_actions/`, `utils/`, `tests/`).
--   [ ] **Dependencies**: Initialize `pyproject.toml` (with Poetry/PDM) or `requirements.txt`. Add `fastmcp`, `atlassian-python-api`, `pydantic`, `python-dotenv`, `uvicorn`.
--   [ ] **Virtual Environment**: Create/Re-initialize and activate a new Python virtual environment and install dependencies.
--   [ ] **`.env` File**: Ensure `.env` is present with necessary `CONFLUENCE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_API_TOKEN`, and `LOG_LEVEL` variables.
--   [ ] **Logging**: Set up basic logging configuration (e.g., in `main.py` or a separate logging config file if FastMCP allows).
--   [ ] **Confluence Client (`confluence_client.py`)**: Implement the Confluence API client instantiation and management. Decide on resource injection strategy with FastMCP.
--   [ ] **Basic Server (`main.py`)**: 
-    -   [ ] Instantiate `FastMCP` server.
-    -   [ ] Register the Confluence client manager as a resource (if applicable).
-    -   [ ] Implement a simple health check/ping tool (e.g., `/tools/ping` that returns `{"status": "ok"}`) to verify FastMCP setup.
-    -   [ ] Ensure the server can start (e.g., `python -m confluence_mcp_server.main` or FastMCP's run command).
--   [ ] **Claude Desktop Manifest**: Create or define the structure for `claude_desktop_config.json` (or `tool.json`) required for Claude Desktop integration.
--   [ ] **Testing Setup (`conftest.py`)**: 
-    -   [ ] Configure `pytest` and `pytest-asyncio`.
-    -   [ ] Create a fixture for the `FastMCP` server instance.
-    -   [ ] Create a fixture for an `httpx.AsyncClient` pointing to the test server instance.
-    -   [ ] Create a fixture for a mocked `Confluence` API client.
--   [ ] **Error Handling Utilities (`utils/error_handling.py`)**: Implement initial structure for `handle_confluence_api_error` function.
+## 🚨 CRITICAL RULES - DO NOT DEVIATE
 
-## Phase 2: Implement Page Tools
+### ❌ FORBIDDEN APPROACHES
+1. **NO HTTP Proxy Architecture** - Do not create HTTP servers or proxy endpoints
+2. **NO Threading** - Do not run FastMCP in separate threads
+3. **NO Complex Lifespan Management** - Use simple, direct FastMCP patterns
+4. **NO Manual Tool Registration Loops** - Use FastMCP decorators only
+5. **NO `app.router.lifespan_context()`** - This method doesn't exist
 
-For each page tool (`get_page`, `search_pages`, `create_page`, `update_page`, `delete_page`):
+### ✅ MANDATORY APPROACHES  
+1. **Direct FastMCP Testing** - Use in-memory FastMCPTransport
+2. **Decorator Pattern** - Register tools with `@mcp_server.tool()` decorators
+3. **Simple Fixtures** - Minimal pytest fixtures with clear responsibilities
+4. **Mock httpx.AsyncClient** - Mock the HTTP client, not the Confluence API
+5. **Single Process Testing** - All tests run in single async event loop
 
-**Tool: Get Page (`get_confluence_page`)**
--   [ ] **Schemas (`schemas.py`)**: Define `GetPageInput` and `PageOutput` Pydantic models.
--   [ ] **Logic (`page_actions.py`)**: Implement `async def get_page_logic(...)` using the Confluence client and error handling.
--   [ ] **Registration (`main.py`)**: Register the `get_confluence_page` tool with FastMCP, linking to its logic and schemas.
--   [ ] **Unit Tests (`tests/test_page_actions.py`)**: Test `get_page_logic` with mocked Confluence client (success, page not found, API errors).
--   [ ] **Integration Tests (`tests/test_page_actions.py`)**: Test the full `/tools/get_confluence_page` endpoint (valid inputs, input validation errors, API errors resulting in MCPError).
+## 📋 TASK BREAKDOWN
 
-**Tool: Search Pages (`search_confluence_pages`)**
--   [ ] **Schemas**: Define `SearchPagesInput` and `SearchPagesOutput` (with `PageOutputItem` or re-using `PageOutput`).
--   [ ] **Logic**: Implement `async def search_pages_logic(...)`.
--   [ ] **Registration**: Register in `main.py`.
--   [ ] **Unit Tests**: For `search_pages_logic`.
--   [ ] **Integration Tests**: For `/tools/search_confluence_pages`.
+### Phase 1: Core Architecture (PRIORITY 1)
+- [x] **T1.1**: Fix main.py tool registration (Remove `_tool_adapter_factory`)
+- [x] **T1.2**: Implement proper FastMCP tool decorators  
+- [x] **T1.3**: Fix Confluence API URLs (remove `/wiki` prefix)
+- [x] **T1.4**: Simplify application startup (no threading)
+- [x] **T1.5**: Create proper httpx.AsyncClient setup
 
-**Tool: Create Page (`create_confluence_page`)**
--   [ ] **Schemas**: Define `CreatePageInput` (output can be `PageOutput`).
--   [ ] **Logic**: Implement `async def create_page_logic(...)`.
--   [ ] **Registration**: Register in `main.py`.
--   [ ] **Unit Tests**: For `create_page_logic`.
--   [ ] **Integration Tests**: For `/tools/create_confluence_page`.
+### Phase 2: Testing Infrastructure (PRIORITY 1)
+- [x] **T2.1**: Create simplified conftest.py (max 50 lines)
+- [x] **T2.2**: Implement FastMCPTransport testing
+- [x] **T2.3**: Create httpx.AsyncClient mock fixtures
+- [x] **T2.4**: Remove all HTTP proxy test code
+- [x] **T2.5**: Verify pytest-asyncio configuration (Resolved: Migrated to and configured pytest-anyio, removed pytest-asyncio, suppressed related warnings)
 
-**Tool: Update Page (`update_confluence_page`)**
--   [ ] **Schemas**: Define `UpdatePageInput` (output can be `PageOutput`).
--   [ ] **Logic**: Implement `async def update_page_logic(...)` (remember to fetch current version).
--   [ ] **Registration**: Register in `main.py`.
--   [ ] **Unit Tests**: For `update_page_logic`.
--   [ ] **Integration Tests**: For `/tools/update_confluence_page`.
+### Phase 3: Test Implementation (PRIORITY 2)
+- [~] **T3.1**: Implement delete_page tool tests (5 test cases) - (1 of 5 implemented: `test_delete_page_success`)
+- [ ] **T3.2**: Implement get_page tool tests  
+- [ ] **T3.3**: Implement create_page tool tests
+- [ ] **T3.4**: Implement update_page tool tests
+- [ ] **T3.5**: Implement search_pages tool tests
 
-**Tool: Delete Page (`delete_confluence_page`)**
--   [ ] **Schemas**: Define `DeletePageInput` and `DeletePageOutput`.
--   [ ] **Logic**: Implement `async def delete_page_logic(...)`.
--   [ ] **Registration**: Register in `main.py`.
--   [ ] **Unit Tests**: For `delete_page_logic`.
--   [ ] **Integration Tests**: For `/tools/delete_confluence_page`.
+### Phase 4: Validation & Documentation (PRIORITY 3)
+- [ ] **T4.1**: Final architectural review
+- [ ] **T4.2**: Update README.md with setup and usage
+- [ ] **T4.3**: Add inline code comments for clarity
+- [ ] **T4.4**: Ensure all dependencies are pinned
+- [ ] **T4.5**: Create a `requirements-dev.txt` (or ensure pyproject.toml dev group is complete)
 
-## Phase 3: Implement Space Tools
+## ✅ CHECKLISTS (Mark as [x] when complete)
 
-**Tool: Get Spaces (`get_confluence_spaces`)**
--   [ ] **Schemas (`schemas.py`)**: Define `GetSpacesInput`, `GetSpacesOutputItem`, `GetSpacesOutput`.
--   [ ] **Logic (`space_actions.py`)**: Implement `async def get_spaces_logic(...)`.
--   [ ] **Registration (`main.py`)**: Register the `get_confluence_spaces` tool.
--   [ ] **Unit Tests (`tests/test_space_actions.py`)**: For `get_spaces_logic`.
--   [ ] **Integration Tests (`tests/test_space_actions.py`)**: For `/tools/get_confluence_spaces`.
+### Architectural Validation
+- [x] FastMCP server initialized directly (no HTTP proxy)
+- [x] FastMCP server NOT run in a separate thread for testing
+- [x] All tools registered using FastMCP decorators
+- [x] Confluence API URLs are correct
+- [x] httpx.AsyncClient is used for API calls
+- [x] Async context management is simple and direct
+- [x] No complex lifespan events for FastMCP
+- [x] FastMCP tools registered with decorators only
+- [x] Single async event loop for all tests (managed by pytest-anyio)
 
-## Phase 4: Implement Comment Tools
+### Code Quality Validation  
+- [ ] All imports are absolute (no relative imports)
+- [x] httpx.AsyncClient properly mocked in tests
+- [ ] Error handling covers all HTTP status codes (Partially for delete_page)
+- [x] Logging configured and working
+- [x] Type hints present and correct (Largely, ongoing)
 
-**Tool: Get Comments (`get_confluence_page_comments`)**
--   [ ] **Schemas (`schemas.py`)**: Define `GetCommentsInput`, `CommentOutputItem`, `GetCommentsOutput`.
--   [ ] **Logic (`comment_actions.py`)**: Implement `async def get_comments_logic(...)`.
--   [ ] **Registration (`main.py`)**: Register the `get_confluence_page_comments` tool.
--   [ ] **Unit Tests (`tests/test_comment_actions.py`)**: For `get_comments_logic`.
--   [ ] **Integration Tests (`tests/test_comment_actions.py`)**: For `/tools/get_confluence_page_comments`.
+### Test Validation
+- [x] Tests use FastMCPTransport (in-memory via Client)
+- [x] Fixtures are simple and focused  
+- [x] Mock strategies are consistent
+- [x] Test data is realistic (For `test_delete_page_success`)
+- [ ] Edge cases are covered (Partially for delete_page)
 
-## Phase 5: Implement Attachment Tools
+## 🔄 IMPLEMENTATION ORDER
 
-*(Review existing `attachment_actions.py` and `test_attachment_actions.py` from previous work if it's already FastMCP compatible and high quality. Refactor or rewrite as needed to align with the new architecture.)*
+**DO NOT CHANGE THIS ORDER WITHOUT APPROVAL**
 
-**Tool: Get Attachments (`get_confluence_page_attachments`)**
--   [ ] **Schemas (`schemas.py`)**: Define/Review `GetAttachmentsInput`, `AttachmentOutputItem`, `GetAttachmentsOutput`.
--   [ ] **Logic (`attachment_actions.py`)**: Implement/Review `async def get_attachments_logic(...)`.
--   [ ] **Registration (`main.py`)**: Register the `get_confluence_page_attachments` tool.
--   [ ] **Unit Tests (`tests/test_attachment_actions.py`)**: For `get_attachments_logic`.
--   [ ] **Integration Tests (`tests/test_attachment_actions.py`)**: For `/tools/get_confluence_page_attachments`.
+1. **First**: Fix main.py (T1.1-T1.5) - **DONE**
+2. **Second**: Create new conftest.py (T2.1-T2.5) - **DONE** 
+3. **Third**: Implement delete_page tests (T3.1) - **IN PROGRESS**
+4. **Fourth**: Verify everything works before proceeding - **DONE for current progress**
+5. **Fifth**: Add remaining tool tests (T3.2-T3.5)
+6. **Sixth**: Validation and documentation (T4.1-T4.5)
 
-**Tool: Add Attachment (`add_confluence_page_attachment`)**
--   [ ] **Schemas (`schemas.py`)**: Define/Review `AddAttachmentInput` and `AddAttachmentOutput`.
--   [ ] **Logic (`attachment_actions.py`)**: Implement/Review `async def add_attachment_logic(...)`.
--   [ ] **Registration (`main.py`)**: Register the `add_confluence_page_attachment` tool.
--   [ ] **Unit Tests (`tests/test_attachment_actions.py`)**: For `add_attachment_logic`.
--   [ ] **Integration Tests (`tests/test_attachment_actions.py`)**: For `/tools/add_confluence_page_attachment`.
+## 💀 COMMON MISTAKES TO AVOID
 
-## Phase 6: Productionization, Deployment & Final Review
+1. **DO NOT** create complex HTTP proxy setups
+2. **DO NOT** use threading for FastMCP server
+3. **DO NOT** try to fix the current `_tool_adapter_factory` - DELETE IT
+4. **DO NOT** create manual tool registration loops
+5. **DO NOT** use `TestClient` - use `FastMCPTransport`
+6. **DO NOT** mock Confluence API endpoints - mock httpx.AsyncClient
+7. **DO NOT** create complex lifespan management code
+8. **DO NOT** use relative imports in tests
 
-### 6.1 MCP Compliance & Claude Desktop Integration
--   [ ] **Tool Listing & Execution**: Verify all tools are correctly listed and executable via MCP protocol (e.g., using a generic MCP client or through Claude Desktop).
--   [ ] **Error Handling Review**: Ensure consistent `MCPError` responses as per `utils/error_handling.py` and MCP standards.
--   [ ] **Claude Desktop Manifest (`tool.json` / `claude_desktop_config.json`)**: Finalize and validate the manifest file for Claude Desktop. Ensure it accurately reflects tools, schemas, and execution commands.
--   [ ] **CORS Configuration**: Confirm CORS is correctly handled by FastMCP for Claude Desktop interactions.
--   [ ] **Claude Desktop End-to-End Testing**: Conduct thorough testing of all tools through the Claude Desktop interface.
+## 📞 ESCALATION CRITERIA
 
-### 6.2 Deployment Operations
--   [ ] **Configuration Management**: Document final strategy for managing `.env` files or other configurations in a deployed environment.
--   [ ] **Structured Logging Review**: Ensure logging is structured, provides sufficient detail for troubleshooting, and sensitive information is not logged.
--   [ ] **Health Check Endpoint**: Confirm the simple health check/ping tool is operational for monitoring.
--   [ ] **(Optional) Packaging/Containerization**: 
-    -   [ ] Consider packaging using Poetry or PDM if not already done.
-    -   [ ] (If applicable) Create `Dockerfile` and `.dockerignore`.
-    -   [ ] (If applicable) Create `docker-compose.yml` for local testing of the containerized application.
+Stop work and escalate if:
+- Tests still fail after implementing recommended approach
+- You're tempted to use HTTP proxy or threading
+- FastMCP tool registration isn't working with decorators
+- You need to create complex async context managers
+- Any single test takes >2 seconds to run
 
-### 6.3 Security Review
--   [ ] **API Token Permissions**: Verify the Confluence API token has only the minimum necessary permissions.
--   [ ] **Input Validation/Sanitization Audit**: Review all tool inputs, especially those used in CQL or sensitive operations, for robust validation (Pydantic) and sanitization.
--   [ ] **Dependency Audit**: Run a security audit on dependencies (e.g., `pip-audit`) and plan updates for any vulnerable packages.
--   [ ] **Error Message Security**: Confirm error messages do not leak sensitive internal details.
+## 🏆 DEFINITION OF DONE
 
-### 6.4 Performance Considerations
--   [ ] **Performance Review**: Briefly review tool logic for any obvious performance issues. Note that primary dependency is Confluence API responsiveness.
--   [ ] **Asynchronous Code Review**: Ensure `async/await` is used appropriately for non-blocking operations.
+Task is complete when:
+- All tests pass consistently (5+ runs)
+- Test suite runs in <10 seconds total  
+- Code follows architectural principles
+- No forbidden approaches are used
+- Documentation is updated
 
-### 6.5 Final Documentation & Code Quality
--   [ ] **Comprehensive Error Handling**: Ensure `utils/error_handling.py` is robust and consistently used by all tool logic functions to return `MCPError` instances.
--   [ ] **Input Validation Review**: Double-check all Pydantic model validators and any custom validation logic in tools.
--   [ ] **Full Test Suite**: Run `pytest` and ensure all (100%) tests pass.
--   [ ] **Code Linting & Formatting**: Apply a consistent code style (e.g., Black, Flake8).
--   [ ] **`README.md` Updates**: Update (or write new) `README.md` with:
-    -   Project overview.
-    -   Setup instructions (virtual env, dependencies, `.env` file).
-    -   How to run the server (including for Claude Desktop).
-    -   How to run tests.
-    -   List of available tools with brief descriptions and example MCP requests.
-    -   Key configuration options.
--   [ ] **Code Cleanup**: Remove any unused code, comments, or print statements.
--   [ ] **Final Review**: Perform a self-review of the entire codebase for consistency, clarity, and correctness.
-
-### 6.6 Release Management (Optional - for more formal releases)
--   [ ] **Versioning**: Decide on a versioning scheme (e.g., SemVer).
--   [ ] **Changelog**: Maintain a `CHANGELOG.md`.
-
-This task list provides a structured approach to the rebuild. Tasks within each phase can often be parallelized for different tools once the foundational elements are in place.
+**Remember**: Simplicity is the goal. If it feels complex, you're probably doing it wrong.
