@@ -11,11 +11,24 @@
 [tool.poetry]
 name = "confluence-mcp-server"
 version = "1.0.0"
-description = "A Model Context Protocol (MCP) server for Confluence integration - Production Ready"
+description = "A Model Context Protocol (MCP) server for Confluence integration - Production Ready with Multi-Transport Support"
 authors = ["Erato949 <164182664+Erato949@users.noreply.github.com>"]
 readme = "README.md"
 packages = [
     { include = "confluence_mcp_server" },
+]
+keywords = ["mcp", "confluence", "atlassian", "protocol", "ai", "llm"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Communications",
+    "Topic :: Office/Business :: Groupware",
 ]
 
 [tool.poetry.dependencies]
@@ -24,16 +37,22 @@ fastmcp = ">=2.3.4,<3.0.0"
 httpx = ">=0.28.1,<0.29.0"
 pydantic = ">=2.0.0,<3.0.0"
 python-dotenv = ">=1.1.0,<2.0.0"
+# HTTP transport dependencies
+fastapi = ">=0.104.0,<1.0.0"
+uvicorn = ">=0.24.0,<1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 pytest-cov = "^6.1.1"
-pytest-anyio = "^0.8.1"
 black = "^25.1.0"
 flake8 = "^7.2.0"
 mypy = "^1.15.0"
 pytest-mock = "^3.14.0"
 pytest-asyncio = "^0.26.0"
+
+[tool.poetry.scripts]
+confluence-mcp-stdio = "confluence_mcp_server.main:main"
+confluence-mcp-http = "confluence_mcp_server.server_http:run_http_server"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

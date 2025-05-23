@@ -2,13 +2,21 @@
 # Core dependencies for production deployment
 
 # Core MCP and API dependencies
-fastmcp==2.4.0
-httpx==0.28.1
-pydantic==2.10.6
-python-dotenv==1.1.0
+fastmcp>=2.3.4,<3.0.0
+httpx>=0.28.1,<0.29.0
+pydantic>=2.0.0,<3.0.0
+python-dotenv>=1.1.0,<2.0.0
+
+# HTTP transport dependencies (for Smithery.ai and other cloud platforms)
+fastapi>=0.104.0,<1.0.0
+uvicorn>=0.24.0,<1.0.0
 
 # Development and testing dependencies
-pytest==8.3.5
-pytest-asyncio==0.26.0
-pytest-mock==3.14.0
-pytest-anyio==0.8.1
+pytest>=8.3.5
+pytest-cov>=6.1.1
+pytest-asyncio>=0.26.0
+black>=25.1.0
+flake8>=7.2.0
+mypy>=1.15.0
+pytest-mock>=3.14.0
+pytest-asyncio>=0.26.0
