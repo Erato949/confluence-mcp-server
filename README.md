@@ -1,5 +1,7 @@
 # Confluence MCP Server
 
+![Release](https://img.shields.io/badge/release-v1.0.0-green.svg) ![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+
 An MCP (Model Context Protocol) server for Confluence integration, built with FastMCP. This server provides LLMs like Claude with direct access to Confluence Cloud functionality through a standardized interface.
 
 ## ✨ Features
