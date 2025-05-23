@@ -1,158 +1,28 @@
-name: confluence-mcp-server
-description: A Model Context Protocol server for Confluence integration
-version: "1.0.0"
-author: Erato949
-license: MIT
-
-# Deployment configuration for Smithery.ai
-deployment:
+version: 1
+startCommand:
   type: http
-  port: 8000
-  
-# Server configuration
-server:
-  # Entry point for HTTP server
-  command: python
-  args: 
-    - -m
-    - confluence_mcp_server.server_http
-  
-  # Environment configuration
-  environment:
-    - CONFLUENCE_URL
-    - CONFLUENCE_USERNAME  
-    - CONFLUENCE_API_TOKEN
-  
-  # Health check configuration
-  health_check:
-    path: /health
-    interval: 30s
-    timeout: 10s
-    retries: 3
-
-# MCP specification compliance
-mcp:
-  version: "2024-11-05"
-  transport: http
-  
-  # Tool configuration
-  tools:
-    lazy_loading: true
-    authentication_required: false  # For tool listing
-    
-  # Endpoints
-  endpoints:
-    list_tools: /mcp
-    call_tool: /mcp
-    cleanup: /mcp
-
-# Dependencies
-dependencies:
-  python: ">=3.10,<4.0"
-  packages:
-    - fastmcp>=2.3.4,<3.0.0
-    - fastapi>=0.104.0
-    - uvicorn>=0.24.0
-    - httpx>=0.28.1,<0.29.0
-    - pydantic>=2.0.0,<3.0.0
-    - python-dotenv>=1.1.0,<2.0.0
-
-# Configuration schema for Smithery users
-config_schema:
-  type: object
-  properties:
-    confluenceUrl:
-      type: string
-      description: Your Confluence instance URL (e.g., https://your-org.atlassian.net)
-      example: "https://your-org.atlassian.net"
-    username:
-      type: string
-      description: Your Confluence username (email address)
-      example: "user@company.com"
-    apiToken:
-      type: string
-      description: Confluence API token from Atlassian Account Settings
-      sensitive: true
-  required:
-    - confluenceUrl
-    - username
-    - apiToken
-
-# Tool descriptions for Smithery catalog
-tools:
-  - name: get_confluence_page
-    description: Retrieve a specific Confluence page with content and metadata
-    category: content
-    
-  - name: search_confluence_pages
-    description: Search for Confluence pages using text queries or CQL
-    category: search
-    
-  - name: create_confluence_page
-    description: Create new pages in Confluence with specified content
-    category: content
-    
-  - name: update_confluence_page
-    description: Update existing Confluence pages
-    category: content
-    
-  - name: delete_confluence_page
-    description: Delete Confluence pages
-    category: content
-    
-  - name: get_confluence_spaces
-    description: List available Confluence spaces
-    category: navigation
-    
-  - name: get_page_attachments
-    description: View attachments on Confluence pages
-    category: attachments
-    
-  - name: add_page_attachment
-    description: Upload files as attachments to Confluence pages
-    category: attachments
-    
-  - name: delete_page_attachment
-    description: Remove attachments from Confluence pages
-    category: attachments
-    
-  - name: get_page_comments
-    description: Read comments on Confluence pages
-    category: collaboration
-
-# Smithery-specific metadata
-smithery:
-  featured: true
-  categories:
-    - collaboration
-    - documentation
-    - content-management
-  tags:
-    - confluence
-    - atlassian
-    - wiki
-    - documentation
-    - collaboration
-  
-  # Usage examples for Smithery documentation
-  examples:
-    - title: "Get Page Content"
-      description: "Retrieve and read a specific Confluence page"
-      tool: get_confluence_page
-      input:
-        page_id: "123456"
-        
-    - title: "Search Documentation"
-      description: "Find pages containing specific keywords"
-      tool: search_confluence_pages
-      input:
-        query: "API documentation"
-        space_key: "TECH"
-        
-    - title: "Create Meeting Notes"
-      description: "Create a new page for meeting notes"
-      tool: create_confluence_page
-      input:
-        space_key: "TEAM"
-        title: "Weekly Team Meeting - 2024-01-15"
-        content: "<h1>Meeting Notes</h1><p>Agenda items...</p>" 
+  configSchema:
+    type: object
+    required:
+      - confluenceUrl
+      - username
+      - apiToken
+    properties:
+      confluenceUrl:
+        type: string
+        title: "Confluence URL"
+        description: "Your Confluence instance URL (e.g., https://your-org.atlassian.net)"
+        examples:
+          - "https://your-org.atlassian.net"
+      username:
+        type: string
+        title: "Username"
+        description: "Your Confluence username (email address)"
+        examples:
+          - "user@company.com"
+      apiToken:
+        type: string
+        title: "API Token"
+        description: "Confluence API token from Atlassian Account Settings"
+        examples:
+          - "ATATT3xFfGF0..." 
