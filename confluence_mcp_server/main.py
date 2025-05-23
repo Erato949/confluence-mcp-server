@@ -110,7 +110,7 @@ async def create_confluence_page(inputs: CreatePageInput, context: Context) -> C
     logger.info(f"Executing create_confluence_page tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await page_actions.create_page_logic(client, inputs, context)
+            return await page_actions.create_page_logic(client, inputs)
     except McpError:
         raise
     except ValidationError as ve:
