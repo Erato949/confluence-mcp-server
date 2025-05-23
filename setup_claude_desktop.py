@@ -53,9 +53,9 @@ def create_claude_config():
         "command": "python",
         "args": [str(main_py_path)],
         "env": {
-            "CONFLUENCE_URL": "https://your-org.atlassian.net",
-            "CONFLUENCE_USERNAME": "your-email@domain.com", 
-            "CONFLUENCE_API_TOKEN": "your-api-token"
+            "CONFLUENCE_URL": "https://feedbackloopai.atlassian.net/wiki/",
+            "CONFLUENCE_USERNAME": "chughes@feedbackloopai.ai", 
+            "CONFLUENCE_API_TOKEN": "ATATT3xFfGF0HrFAZ3elRO5Bv06hTNVAh8PU7OIz-gK3YV0q1m4nzvoQFuyfGDJBclKMP2hj7IJvBotMrBiePPsDusoW8RxHvhi1nqJG0vyK5YCySq76IbPkotFTQi3nHVRDqtZD49uhkJ5JnjmVN02FBvGv5yxHL_YqFeUxt2YacAKrJrvo3Mg=32162271"
         }
     }
     
