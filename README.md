@@ -111,6 +111,7 @@ This server has been specifically designed for Claude Desktop compatibility:
 ✅ **Consistent Tool Signatures**: All tools follow the same input/output pattern  
 ✅ **Proper Error Handling**: MCP-compliant error formatting  
 ✅ **Tested Integration**: Comprehensive test suite ensures reliability  
+✅ **Recently Validated**: Successfully tested with real Confluence instances (January 2025)
 
 ### 🐛 Troubleshooting
 
