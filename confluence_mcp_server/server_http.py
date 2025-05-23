@@ -60,7 +60,8 @@ class HttpTransport:
                 
                 # Get tools list without requiring authentication
                 tools_response = await self._get_tools_list()
-                return tools_response
+                # Return the result directly, not wrapped in JSON-RPC format for GET requests
+                return tools_response["result"]
                 
             except Exception as e:
                 logger.error(f"Error in GET /mcp: {str(e)}")
