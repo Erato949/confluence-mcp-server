@@ -8,7 +8,7 @@ import logging
 from dotenv import load_dotenv
 import httpx # For making HTTP requests to Confluence API
 from fastmcp import FastMCP # Corrected import for FastMCP
-from fastmcp.exceptions import McpError # Corrected to McpError (lowercase 'c')
+from fastmcp.exceptions import ToolError # Using ToolError instead of McpError
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, ValidationError
 from mcp.types import ErrorData
@@ -55,14 +55,14 @@ async def get_confluence_client() -> httpx.AsyncClient:
         httpx.AsyncClient: An authenticated client configured for Confluence API
         
     Raises:
-        McpError: If authentication credentials are missing or invalid
+        ToolError: If authentication credentials are missing or invalid
     """
     confluence_url = os.getenv("CONFLUENCE_URL")
     username = os.getenv("CONFLUENCE_USERNAME") 
     api_token = os.getenv("CONFLUENCE_API_TOKEN")
     
     if not all([confluence_url, username, api_token]):
-        raise McpError("Missing Confluence credentials in environment variables")
+        raise ToolError("Missing Confluence credentials in environment variables")
     
     # Remove trailing slash if present
     base_url = confluence_url.rstrip('/')
@@ -109,7 +109,7 @@ async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
             return result
     except Exception as e:
         logger.error(f"Error in get_confluence_page: {str(e)}")
-        raise McpError(f"Failed to retrieve page: {str(e)}")
+        raise ToolError(f"Failed to retrieve page: {str(e)}")
 
 @mcp_server.tool()
 async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput:
@@ -147,7 +147,7 @@ async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput
             return result
     except Exception as e:
         logger.error(f"Error in search_confluence_pages: {str(e)}")
-        raise McpError(f"Failed to search pages: {str(e)}")
+        raise ToolError(f"Failed to search pages: {str(e)}")
 
 @mcp_server.tool()
 async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
@@ -184,7 +184,7 @@ async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
             return result
     except Exception as e:
         logger.error(f"Error in create_confluence_page: {str(e)}")
-        raise McpError(f"Failed to create page: {str(e)}")
+        raise ToolError(f"Failed to create page: {str(e)}")
 
 @mcp_server.tool()
 async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
@@ -221,7 +221,7 @@ async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
             return result
     except Exception as e:
         logger.error(f"Error in update_confluence_page: {str(e)}")
-        raise McpError(f"Failed to update page: {str(e)}")
+        raise ToolError(f"Failed to update page: {str(e)}")
 
 @mcp_server.tool()
 async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
@@ -255,7 +255,7 @@ async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
             return result
     except Exception as e:
         logger.error(f"Error in delete_confluence_page: {str(e)}")
-        raise McpError(f"Failed to delete page: {str(e)}")
+        raise ToolError(f"Failed to delete page: {str(e)}")
 
 @mcp_server.tool()
 async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
@@ -290,7 +290,7 @@ async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
             return result
     except Exception as e:
         logger.error(f"Error in get_confluence_spaces: {str(e)}")
-        raise McpError(f"Failed to retrieve spaces: {str(e)}")
+        raise ToolError(f"Failed to retrieve spaces: {str(e)}")
 
 @mcp_server.tool()
 async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
@@ -327,7 +327,7 @@ async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOut
             return result
     except Exception as e:
         logger.error(f"Error in get_page_attachments: {str(e)}")
-        raise McpError(f"Failed to retrieve attachments: {str(e)}")
+        raise ToolError(f"Failed to retrieve attachments: {str(e)}")
 
 @mcp_server.tool()
 async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput:
@@ -363,7 +363,7 @@ async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput
             return result
     except Exception as e:
         logger.error(f"Error in add_page_attachment: {str(e)}")
-        raise McpError(f"Failed to add attachment: {str(e)}")
+        raise ToolError(f"Failed to add attachment: {str(e)}")
 
 @mcp_server.tool()
 async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
@@ -397,7 +397,7 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachm
             return result
     except Exception as e:
         logger.error(f"Error in delete_page_attachment: {str(e)}")
-        raise McpError(f"Failed to delete attachment: {str(e)}")
+        raise ToolError(f"Failed to delete attachment: {str(e)}")
 
 @mcp_server.tool()
 async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
@@ -439,7 +439,7 @@ async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
             return result
     except Exception as e:
         logger.error(f"Error in get_page_comments: {str(e)}")
-        raise McpError(f"Failed to retrieve comments: {str(e)}")
+        raise ToolError(f"Failed to retrieve comments: {str(e)}")
 
 # --- Main Execution Block ---
 if __name__ == "__main__":

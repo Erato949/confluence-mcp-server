@@ -118,6 +118,9 @@ async def get_page_logic(client: httpx.AsyncClient, inputs: GetPageInput) -> Pag
     except httpx.RequestError as e:
         logger.error(f"Request error while getting page: {e.request.method} {e.request.url}", exc_info=True)
         raise HTTPException(status_code=503, detail=f"Error connecting to Confluence: {str(e)}") # Service unavailable type error
+    except HTTPException:
+        # Re-raise HTTPException as-is to avoid double wrapping
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error in get_page_logic: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
@@ -387,8 +390,11 @@ async def update_page_logic(client: httpx.AsyncClient, inputs: UpdatePageInput) 
 
         raise HTTPException(status_code=e.response.status_code, detail=f"Error updating page: {error_detail}")
     except httpx.RequestError as e:
-        logger.error(f"Request error during page update for {inputs.page_id}: {e.request.method} {e.request.url}", exc_info=True)
+        logger.error(f"Request error during page update: {e.request.method} {e.request.url}", exc_info=True)
         raise HTTPException(status_code=503, detail=f"Error connecting to Confluence: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTPException as-is to avoid double wrapping
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error in update_page_logic for page {inputs.page_id}: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during page update: {str(e)}")
