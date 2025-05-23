@@ -170,3 +170,6 @@ claude_desktop_config_*.json
 # 🔒 SECURITY - IDE files that might contain credentials
 .vscode/settings.json
 .idea/
+
+# 📋 DOCUMENTATION - Exclude internal technical documentation
+Product_Technical_Architecture.md
