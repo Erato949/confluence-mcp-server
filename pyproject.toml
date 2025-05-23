@@ -2,6 +2,7 @@
     pythonpath = ["."]
     testpaths = ["tests"]
     addopts = "-p no:django"
+    anyio_backends = ["asyncio"]
     filterwarnings = [
         "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning:starlette\\.formparsers",
         "ignore:Passing runtime and transport-specific settings as kwargs to the FastMCP constructor:DeprecationWarning:confluence_mcp_server\\.main"
