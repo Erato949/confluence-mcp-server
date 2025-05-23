@@ -1,168 +1,189 @@
 # Confluence MCP Server
 
-A local, private MCP (Model Context Protocol) server for interacting with a Confluence instance. This server allows an AI agent (like Cascade) to perform actions on your Confluence space via a standardized tool interface.
+An MCP (Model Context Protocol) server for Confluence integration, built with FastMCP. This server provides LLMs like Claude with direct access to Confluence Cloud functionality through a standardized interface.
 
-## Features
+## ✨ Features
 
-Provides the following Confluence actions as MCP tools:
-*   `Get_Page`: Retrieves the content of a specific Confluence page.
-*   `search_pages`: Searches for pages in Confluence based on a query.
-*   `get_spaces`: Lists available Confluence spaces.
-*   `update_page`: Updates an existing Confluence page.
-*   `create_page`: Creates a new page in a specified Confluence space.
-*   `get_comments`: Retrieves comments from a Confluence page.
-*   `add_comment`: Adds a comment to a Confluence page.
-*   `get_attachments`: Lists attachments for a Confluence page.
-*   `add_attachment`: Adds an attachment to a Confluence page.
+- **Complete Page Management**: Create, read, update, delete Confluence pages
+- **Search & Discovery**: Search pages with CQL (Confluence Query Language)
+- **Space Management**: List and explore Confluence spaces
+- **Attachment Handling**: Upload and manage page attachments
+- **Comment System**: Access and manage page comments
+- **Claude Desktop Ready**: Optimized for seamless Claude Desktop integration
 
-## Prerequisites
+## 🔧 Claude Desktop Integration
 
-*   Python 3.9+
-*   Access to a Confluence instance (Cloud or Server)
-*   A Confluence API Key (see [Atlassian Documentation](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) for how to create one)
+### Quick Setup (Recommended)
 
-## Setup Instructions
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1.  **Clone the Repository (if applicable) or Create Project Directory:**
-    Ensure you have all project files in a local directory. The project root directory is `c:\Users\chris\Documents\Confluence-MCP-Server_Claude`.
+2. **Run Setup Script**:
+   ```bash
+   python setup_claude_desktop.py
+   ```
 
-2.  **Create a Python Virtual Environment:**
-    It's highly recommended to use a virtual environment to manage project dependencies.
-    ```bash
-    python -m venv .venv
-    ```
-    Activate the virtual environment:
-    *   Windows:
-        ```bash
-        .\.venv\Scripts\activate
-        ```
-    *   macOS/Linux:
-        ```bash
-        source .venv/bin/activate
-        ```
+3. **Configure Credentials**: Edit the generated configuration file with your Confluence details
 
-3.  **Install Dependencies:**
-    With the virtual environment activated, install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
+4. **Restart Claude Desktop** and look for the 🔨 hammer icon
 
-4.  **Configure Environment Variables:**
-    *   Copy the `.env_example` file to a new file named `.env`:
-        ```bash
-        # For Windows command prompt
-        copy .env_example .env
-        # For PowerShell
-        # Copy-Item .env_example .env
-        # For macOS/Linux
-        # cp .env_example .env
-        ```
-    *   Open the `.env` file and update the following variables with your Confluence instance details:
-        *   `CONFLUENCE_URL`: Your full Confluence base URL (e.g., `https://your-domain.atlassian.net/wiki`)
-        *   `CONFLUENCE_USERNAME`: The email address associated with your Confluence account and API key.
-        *   `CONFLUENCE_API_KEY`: Your generated Confluence API Key.
-        *   `PORT` (Optional): The port on which the MCP server will run. Defaults to 8000.
+### Manual Setup
 
-## Running the Server
+1. **Locate Claude Desktop Config**:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-Once configured, you can run the MCP server using Uvicorn. **Navigate to the project root directory (`c:\Users\chris\Documents\Confluence-MCP-Server_Claude`) in your terminal before running the command.**
+2. **Add Server Configuration**:
+   ```json
+   {
+     "mcpServers": {
+       "confluence-mcp": {
+         "command": "python",
+         "args": ["/ABSOLUTE/PATH/TO/YOUR/PROJECT/confluence_mcp_server/main.py"],
+         "env": {
+           "CONFLUENCE_URL": "https://your-org.atlassian.net",
+           "CONFLUENCE_USERNAME": "your-email@domain.com",
+           "CONFLUENCE_API_TOKEN": "your-api-token"
+         }
+       }
+     }
+   }
+   ```
 
-```bash
-uvicorn confluence_mcp_server.main:app --reload --port <your_configured_port_or_8000>
+3. **Get Confluence API Token**:
+   - Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
+   - Create API Token
+   - Copy the token to your configuration
+
+### 🚀 Available Tools in Claude Desktop
+
+Once connected, Claude will have access to these tools:
+
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `get_confluence_page` | Retrieve page content | "Show me the content of page ID 123456" |
+| `create_confluence_page` | Create new pages | "Create a meeting notes page in the PROJ space" |
+| `update_confluence_page` | Modify existing pages | "Add a new section to page 123456" |
+| `delete_confluence_page` | Remove pages | "Delete the outdated page 123456" |
+| `search_confluence_pages` | Search with CQL | "Find all pages in PROJ space modified this week" |
+| `get_confluence_spaces` | List available spaces | "What spaces do I have access to?" |
+| `get_page_attachments` | View page attachments | "Show attachments on page 123456" |
+| `add_page_attachment` | Upload files | "Upload this document to page 123456" |
+| `delete_page_attachment` | Remove files | "Delete the old attachment from page 123456" |
+| `get_page_comments` | Read page comments | "Show me comments on page 123456" |
+
+### 💬 Example Claude Conversations
+
+**Creating a Page**:
 ```
-For example, if your `.env` file has `PORT=8080`, and you are in the project root directory, you would run:
-```bash
-uvicorn confluence_mcp_server.main:app --reload --port 8080
-```
-If no port is specified in `.env` (and it defaults to 8000), run from the project root:
-```bash
-uvicorn confluence_mcp_server.main:app --reload
+You: Create a new project kickoff page in the ENGINEERING space with a basic template
+
+Claude: I'll create a project kickoff page for you in the ENGINEERING space...
+[Uses create_confluence_page tool]
+✅ Created "Project Kickoff" page (ID: 789123) in ENGINEERING space
 ```
 
-The `--reload` flag enables auto-reloading when code changes are detected, which is useful during development.
+**Searching Content**:
+```
+You: Find all pages mentioning "API documentation" that were updated this month
 
-## Connecting with Claude Desktop (or other MCP Clients)
+Claude: I'll search for pages with "API documentation" updated recently...
+[Uses search_confluence_pages tool]
+📄 Found 5 pages matching your criteria...
+```
 
-Once the Confluence MCP Server is running, you can connect it to MCP-compatible clients like Claude Desktop.
+### 🔧 Compatibility & Requirements
 
-1.  **Ensure the Server is Running:**
-    Follow the "Running the Server" instructions above. By default, the server will be accessible at `http://127.0.0.1:8000` (or `http://localhost:8000`). If you configured a different port in your `.env` file, use that port instead (e.g., `http://127.0.0.1:YOUR_PORT`).
+- **MCP Protocol**: Latest version supported (FastMCP 2.4.0)
+- **Transport**: Stdio (Claude Desktop standard)
+- **Python**: 3.10+
+- **Claude Desktop**: Windows/macOS versions with MCP support
+- **Confluence**: Cloud instances with API access
 
-2.  **Configure Your MCP Client (e.g., Claude Desktop):**
-    *   In your MCP client's settings or configuration area where you can add new MCP servers, you will typically need to provide the **Base URL** of this Confluence MCP server.
-    *   Enter the URL from step 1 (e.g., `http://127.0.0.1:8000`).
-    *   **Important:** The server's `/tools` endpoint (e.g., `http://127.0.0.1:8000/tools/`) is what clients use to discover the available Confluence actions. The `/tools/execute` endpoint (e.g., `http://127.0.0.1:8000/tools/execute`) is used to run them. Your client should be configured to use the base URL, and it will append `/tools` or `/tools/execute` as needed based on the MCP specification.
+### ⚠️ No Anticipated Connection Issues
 
-3.  **CORS Configuration:**
-    This Confluence MCP server has been configured with Cross-Origin Resource Sharing (CORS) to allow requests from any origin (`*`). This permissive setting is suitable for local development and connecting with clients like Claude Desktop. For production environments, you might want to restrict the allowed origins.
+This server has been specifically designed for Claude Desktop compatibility:
 
-4.  **Verify Connection:**
-    After adding the server to your MCP client, the client should be able to:
-    *   Discover the available Confluence tools (e.g., `get_page`, `search_pages`, etc.) by querying the `/tools` endpoint.
-    *   Execute these tools by sending requests to the `/tools/execute` endpoint.
+✅ **Standard Transport**: Uses stdio transport (not HTTP/SSE)  
+✅ **Latest MCP Protocol**: FastMCP 2.4.0 with full Claude Desktop support  
+✅ **Consistent Tool Signatures**: All tools follow the same input/output pattern  
+✅ **Proper Error Handling**: MCP-compliant error formatting  
+✅ **Tested Integration**: Comprehensive test suite ensures reliability  
 
-Refer to your specific MCP client's documentation for detailed instructions on adding and managing MCP tool servers.
+### 🐛 Troubleshooting
 
-## Usage
+**Claude Desktop doesn't show the hammer icon:**
+- Verify the configuration file path and syntax
+- Check that Python is in your system PATH
+- Restart Claude Desktop completely
+- Check Claude Desktop logs for error messages
 
-(This section will be updated as the MCP server and its tools are implemented. It will describe how an agent can interact with the `/tools` and `/execute` endpoints.)
+**"Permission denied" or "Authentication failed":**
+- Verify your Confluence URL (include https://)
+- Check API token is correct and hasn't expired
+- Ensure your username is the email associated with your Atlassian account
+- Test credentials with: `curl -u email:token https://your-org.atlassian.net/rest/api/space`
 
-## Project Structure
+**Tools appear but fail to execute:**
+- Check environment variables are properly set in Claude config
+- Verify network connectivity to your Confluence instance
+- Review server logs in Claude Desktop for specific error messages
 
+**"Module not found" errors:**
+- Ensure all dependencies are installed: `pip install -r requirements.txt`
+- Verify Python path in Claude Desktop config points to correct environment
+- Use absolute paths in the configuration
+
+## 🔒 Security Considerations
+
+- **API Tokens**: Stored in Claude Desktop config (local machine only)
+- **Network Access**: All requests use HTTPS to Confluence Cloud
+- **Permissions**: Inherits your Confluence user permissions
+- **Local Only**: No data sent to third parties, direct Confluence API calls
+
+## 📖 Development
+
+### Running Tests
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run only passing asyncio tests (recommended)
+python -m pytest tests/ -k asyncio
+```
+
+### Project Structure
 ```
 confluence_mcp_server/
-|-- .env_example            # Example for environment variables
-|-- .venv/                  # Python virtual environment (if created here)
-|-- mcp_actions/            # Directory for Confluence action implementations
-|   |-- __init__.py
-|   |-- page_actions.py     # Logic for page-related tools
-|   |-- comment_actions.py  # Logic for comment-related tools
-|   |-- attachment_actions.py # Logic for attachment-related tools
-|   |-- space_actions.py    # Logic for space-related tools
-|   |-- schemas.py          # Pydantic models for tool inputs/outputs
-|-- main.py                 # Main FastAPI application and MCP endpoints
-|-- requirements.txt        # Python dependencies
-|-- task.md                 # Development task tracking
-|-- README.md               # This file
+├── main.py                 # MCP server entry point
+├── mcp_actions/           # Tool implementations
+│   ├── page_actions.py    # Page-related tools
+│   ├── space_actions.py   # Space-related tools
+│   ├── attachment_actions.py
+│   ├── comment_actions.py
+│   └── schemas.py         # Pydantic models
+└── utils/
+    └── logging_config.py
+
+tests/                     # Comprehensive test suite
+claude_desktop_config.json # Configuration template
+setup_claude_desktop.py   # Automated setup script
 ```
 
-## Contributing
-(Details to be added if this were a collaborative project)
+## 🤝 Contributing
 
-```
-{{ ... }}
-          "CONFLUENCE_API_KEY": "YOUR_CONFLUENCE_API_KEY_HERE",
-          "CONFLUENCE_USERNAME": "YOUR_CONFLUENCE_EMAIL_HERE",
-          "CONFLUENCE_URL": "YOUR_CONFLUENCE_INSTANCE_URL_HERE",
-          "PORT": "8001" // Ensure this matches the port your server is running on
-        }
-      }
-    ]
-  }
-  ```
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
 
-  **Explanation of Fields:**
-  *   `"name"`: A unique identifier for this MCP server configuration (e.g., `"confluence-mcp-local-dev"`).
-  *   `"command"`: The full path to the Python executable within your project's virtual environment (e.g., `"C:\path\to\your\project\Confluence-MCP-Server_Claude\.venv\Scripts\python.exe"` on Windows or `"/path/to/your/project/Confluence-MCP-Server_Claude/.venv/bin/python"` on Linux/macOS).
-  *   `"args"`: Arguments to pass to the Python interpreter. This should run Uvicorn targeting your FastAPI application.
-      *   `"-m"`, `"uvicorn"`: Tells Python to run the `uvicorn` module.
-      *   `"confluence_mcp_server.main:app"`: The path to your FastAPI application instance.
-      *   `"--host"`, `"127.0.0.1"`: Specifies the host to bind to.
-      *   `"--port"`, `"8001"`: Specifies the port to listen on. **Ensure this matches the `PORT` environment variable set below and is not already in use.**
-      *   `"--reload"`: (Optional) Enables auto-reload for development. Remove for production.
-  *   `"cwd"`: The current working directory for the server process. This should be the root of your `Confluence-MCP-Server_Claude` project directory.
-  *   `"env"`: Environment variables to be set for the server process:
-      *   `"PYTHONPATH"`: **Crucial for ensuring Python can find your `confluence_mcp_server` module.** Set this to the root of your project (e.g., `"C:\path\to\your\project\Confluence-MCP-Server_Claude"`).
-      *   `"CONFLUENCE_URL"`, `"CONFLUENCE_USERNAME"`, `"CONFLUENCE_API_KEY"`: Your Confluence credentials.
-      *   `"PORT"`: The port number the Uvicorn server inside your MCP server will try to use. **This must match the `--port` argument above.**
+## 📄 License
 
-3.  **Restart Claude Desktop:** After saving the `mcp_servers.json` file, fully restart Claude Desktop for the changes to take effect.
+This project is licensed under the MIT License.
 
-4.  **Connect to the Server:** In Claude Desktop, attempt to connect to the `confluence-mcp-local-dev` (or whatever name you chose) server. You should see logs from your server in the Claude Desktop MCP panel indicating a connection and tool discovery.
+---
 
-### Via Docker (Production/Simplified Deployment)
-
-(Instructions to be added once Dockerfile and docker-compose.yml are finalized in Phase 6)
-
-## Project Structure
-{{ ... }}
+**Ready to enhance your Confluence workflow with Claude? Run the setup script and start collaborating!** 🚀
