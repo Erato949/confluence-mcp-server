@@ -7,10 +7,22 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator, field_validator
 
 # --- Get_Page Schemas ---
 class GetPageInput(BaseModel):
-    page_id: Optional[str] = Field(default=None, description="The ID of the page to retrieve.")
-    space_key: Optional[str] = Field(default=None, description="The key of the space where the page resides (used with title).")
-    title: Optional[str] = Field(default=None, description="The title of the page to retrieve (used with space_key).")
-    expand: Optional[str] = Field(default=None, description="A comma-separated list of properties to expand (e.g., 'body.view,version,space').")
+    page_id: Optional[str] = Field(
+        default=None, 
+        description="The ID of the page to retrieve. Example: '123456789'. Use this when you know the exact page ID for fastest retrieval."
+    )
+    space_key: Optional[str] = Field(
+        default=None, 
+        description="The key of the space where the page resides (used with title). Example: 'DOCS', 'TECH', '~username'. Required when using title parameter."
+    )
+    title: Optional[str] = Field(
+        default=None, 
+        description="The title of the page to retrieve (used with space_key). Example: 'Meeting Notes', 'API Documentation'. Must be exact match."
+    )
+    expand: Optional[str] = Field(
+        default=None, 
+        description="Comma-separated list of properties to expand. Examples: 'body.view' (HTML content), 'body.storage' (raw XML), 'version,space,history'. Use to get page content and metadata."
+    )
 
     @model_validator(mode='after')
     def check_page_id_or_space_key_and_title(cls, values):
@@ -38,13 +50,38 @@ class PageOutput(BaseModel):
 
 # --- Search_Pages Schemas ---
 class SearchPagesInput(BaseModel):
-    query: Optional[str] = Field(default=None, description="The search query string (e.g., free text).")
-    cql: Optional[str] = Field(default=None, description="A CQL (Confluence Query Language) string for advanced searching.")
-    space_key: Optional[str] = Field(default=None, description="The key of the space to limit the search to.")
-    limit: int = Field(default=25, ge=1, le=100, description="Maximum number of pages to return.")
-    start: int = Field(default=0, ge=0, description="Starting offset for pagination.")
-    expand: Optional[str] = Field(default=None, description="A comma-separated list of properties to expand for each result (e.g., 'body.view,version').")
-    excerpt: Optional[str] = Field(default=None, pattern=r"^(none|highlight|indexed)$", description="Type of excerpt to include (none, highlight, indexed).")
+    query: Optional[str] = Field(
+        default=None, 
+        description="Simple text search query. Example: 'meeting notes', 'API documentation', 'project status'. Searches page titles and content."
+    )
+    cql: Optional[str] = Field(
+        default=None, 
+        description="Advanced CQL (Confluence Query Language) query. Examples: 'space = DOCS AND title ~ \"API*\"', 'created >= \"2024-01-01\"', 'creator = currentUser()'. Use for precise searches."
+    )
+    space_key: Optional[str] = Field(
+        default=None, 
+        description="Limit search to specific space. Example: 'DOCS', 'TECH'. Can be combined with query or cql parameters."
+    )
+    limit: int = Field(
+        default=25, 
+        ge=1, 
+        le=100, 
+        description="Maximum number of results to return (1-100). Default: 25. Use higher values for comprehensive searches."
+    )
+    start: int = Field(
+        default=0, 
+        ge=0, 
+        description="Starting offset for pagination. Default: 0. Use with limit for paging through large result sets."
+    )
+    expand: Optional[str] = Field(
+        default=None, 
+        description="Expand properties for search results. Examples: 'body.view' (get content preview), 'version,space'. Adds detail to results but increases response size."
+    )
+    excerpt: Optional[str] = Field(
+        default=None, 
+        pattern=r"^(none|highlight|indexed)$", 
+        description="Type of content excerpt to include. Options: 'none' (no excerpt), 'highlight' (highlighted matches), 'indexed' (plain excerpt). Default: none."
+    )
 
     @model_validator(mode='after')
     def check_query_or_cql_provided(cls, values):
@@ -92,11 +129,23 @@ class GetSpacesOutput(BaseModel):
 
 # --- Create_Page Schemas ---
 class CreatePageInput(BaseModel):
-    space_key: str = Field(..., description="The key of the space where the page will be created.")
-    title: str = Field(..., min_length=1, description="The title of the new page.")
-    content: str = Field(..., description="The content of the new page (usually in Confluence Storage Format - XML).")
-    parent_page_id: Optional[str] = Field(default=None, description="The ID of the parent page, if this is a child page.")
-    # Consider adding content_type (e.g., 'storage', 'wiki') if API supports/requires
+    space_key: str = Field(
+        ..., 
+        description="The key of the space where the page will be created. Example: 'DOCS', 'TECH', '~username'. Required field - get available spaces using get_confluence_spaces."
+    )
+    title: str = Field(
+        ..., 
+        min_length=1, 
+        description="The title of the new page. Example: 'API Documentation', 'Meeting Notes 2024-01-15'. Must be unique within the space."
+    )
+    content: str = Field(
+        ..., 
+        description="Page content in Confluence Storage Format (XML). Example: '<p>Hello world</p>', '<h1>Title</h1><p>Content...</p>'. Use HTML-like tags for formatting."
+    )
+    parent_page_id: Optional[str] = Field(
+        default=None, 
+        description="ID of parent page to create child page. Example: '123456789'. Leave empty to create top-level page in space."
+    )
 
 class CreatePageOutput(BaseModel):
     page_id: str = Field(..., description="The ID of the newly created page.")
@@ -109,17 +158,32 @@ class CreatePageOutput(BaseModel):
 
 # --- Update_Page Schemas ---
 class UpdatePageInput(BaseModel):
-    page_id: str = Field(..., description="The ID of the page to update.")
-    new_version_number: int = Field(..., gt=0, description="The new version number for the page (must be current version + 1).")
-    title: Optional[str] = Field(default=None, min_length=1, description="The new title for the page. If None, title remains unchanged.")
-    content: Optional[str] = Field(default=None, description="The new content for the page (usually Confluence Storage Format). If None, content remains unchanged.")
-    # space_key: Optional[str] = Field(default=None, description="If provided, attempts to move the page to this space. Requires appropriate permissions.") # Moving might be a separate tool
-    parent_page_id: Optional[str] = Field(default=None, description="The ID of the new parent page. If None, parent remains unchanged. Use empty string or special value if API needs it to make it top-level.")
-    # status: Optional[str] = Field(default=None, description="New status for the page (e.g., 'archived').") # Status update might be part of this or separate
+    page_id: str = Field(
+        ..., 
+        description="The ID of the page to update. Example: '123456789'. Get this from get_confluence_page or search_confluence_pages."
+    )
+    new_version_number: int = Field(
+        ..., 
+        gt=0, 
+        description="The new version number for the page (must be current version + 1). Example: if current version is 5, use 6. Get current version from get_confluence_page."
+    )
+    title: Optional[str] = Field(
+        default=None, 
+        min_length=1, 
+        description="New title for the page. Example: 'Updated API Documentation'. Leave empty to keep current title unchanged."
+    )
+    content: Optional[str] = Field(
+        default=None, 
+        description="New content in Confluence Storage Format (XML). Example: '<p>Updated content...</p>'. Leave empty to keep current content unchanged."
+    )
+    parent_page_id: Optional[str] = Field(
+        default=None, 
+        description="ID of new parent page to move this page. Example: '987654321'. Use empty string '' to make page top-level. Leave as None to keep current parent."
+    )
 
     @model_validator(mode='after')
     def check_at_least_one_updatable_field(cls, values):
-        if values.title is None and values.content is None and values.parent_page_id is None: # and values.space_key is None and values.status is None:
+        if values.title is None and values.content is None and values.parent_page_id is None:
             raise ValueError("At least one field (title, content, parent_page_id) must be provided to update the page.")
         return values
 
