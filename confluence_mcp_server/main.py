@@ -11,6 +11,7 @@ from fastmcp import FastMCP, Context # Corrected import for FastMCP
 from fastmcp.exceptions import McpError # Corrected to McpError (lowercase 'c')
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, ValidationError
+from mcp.types import ErrorData
 
 # Local Application/Library Specific Imports
 from confluence_mcp_server.utils.logging_config import setup_logging
@@ -55,7 +56,7 @@ def get_confluence_client() -> httpx.AsyncClient:
 
     if not all([confluence_url, username, api_token]):
         logger.error("Confluence API credentials or URL are not fully configured in .env file.")
-        raise McpError(code=-32000, message="Server configuration error: Confluence credentials missing.")
+        raise McpError(ErrorData(code=-32000, message="Server configuration error: Confluence credentials missing."))
 
     if not confluence_url.endswith('/'):
         confluence_url += '/'
@@ -75,16 +76,16 @@ async def get_confluence_page(inputs: GetPageInput, context: Context) -> PageOut
     logger.info(f"Executing get_confluence_page tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await page_actions.get_page_logic(client, inputs, context)
+            return await page_actions.get_page_logic(client, inputs)
     except McpError:
         raise
     except ValidationError as ve:
         logger.error(f"Input validation error in get_confluence_page: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in get_confluence_page: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def search_confluence_pages(inputs: SearchPagesInput, context: Context) -> SearchPagesOutput:
@@ -98,10 +99,10 @@ async def search_confluence_pages(inputs: SearchPagesInput, context: Context) ->
     except ValidationError as ve:
         logger.error(f"Input validation error in search_confluence_pages: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in search_confluence_pages: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def create_confluence_page(inputs: CreatePageInput, context: Context) -> CreatePageOutput:
@@ -115,10 +116,10 @@ async def create_confluence_page(inputs: CreatePageInput, context: Context) -> C
     except ValidationError as ve:
         logger.error(f"Input validation error in create_confluence_page: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in create_confluence_page: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def update_confluence_page(inputs: UpdatePageInput, context: Context) -> UpdatePageOutput:
@@ -132,10 +133,10 @@ async def update_confluence_page(inputs: UpdatePageInput, context: Context) -> U
     except ValidationError as ve:
         logger.error(f"Input validation error in update_confluence_page: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in update_confluence_page: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def delete_confluence_page(inputs: DeletePageInput, context: Context) -> DeletePageOutput:
@@ -149,16 +150,13 @@ async def delete_confluence_page(inputs: DeletePageInput, context: Context) -> D
     except ValidationError as ve:
         logger.error(f"Input validation error in delete_confluence_page: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        # McpError does not take 'code'. It takes 'message' and optionally 'data'.
-        # We can pass the structured errors in 'data' if needed, or just a message.
-        raise McpError(msg=f"Invalid parameters: {error_details}", data=ve.errors())
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except HTTPException as http_exc: # More specific handling for HTTPExceptions from logic layer
         logger.error(f"HTTPException in delete_confluence_page: {http_exc.status_code} - {http_exc.detail}", exc_info=True)
-        raise McpError(msg=f"Confluence API error: {http_exc.detail}")
+        raise McpError(ErrorData(code=-32000, message=f"Confluence API error: {http_exc.detail}"))
     except Exception as e:
         logger.error(f"Unexpected error in delete_confluence_page: {e}", exc_info=True)
-        # McpError does not take 'code'.
-        raise McpError(msg=f"Tool execution error: {str(e)}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {str(e)}"))
 
 @mcp_server.tool()
 async def get_confluence_spaces(inputs: GetSpacesInput, context: Context) -> GetSpacesOutput:
@@ -172,10 +170,10 @@ async def get_confluence_spaces(inputs: GetSpacesInput, context: Context) -> Get
     except ValidationError as ve:
         logger.error(f"Input validation error in get_confluence_spaces: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in get_confluence_spaces: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def get_page_attachments(inputs: GetAttachmentsInput, context: Context) -> GetAttachmentsOutput:
@@ -189,10 +187,10 @@ async def get_page_attachments(inputs: GetAttachmentsInput, context: Context) ->
     except ValidationError as ve:
         logger.error(f"Input validation error in get_page_attachments: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in get_page_attachments: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def add_page_attachment(inputs: AddAttachmentInput, context: Context) -> AddAttachmentOutput:
@@ -206,10 +204,10 @@ async def add_page_attachment(inputs: AddAttachmentInput, context: Context) -> A
     except ValidationError as ve:
         logger.error(f"Input validation error in add_page_attachment: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in add_page_attachment: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def delete_page_attachment(inputs: DeleteAttachmentInput, context: Context) -> DeleteAttachmentOutput:
@@ -223,10 +221,10 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput, context: Context
     except ValidationError as ve:
         logger.error(f"Input validation error in delete_page_attachment: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in delete_page_attachment: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 @mcp_server.tool()
 async def get_page_comments(inputs: GetCommentsInput, context: Context) -> GetCommentsOutput:
@@ -240,10 +238,10 @@ async def get_page_comments(inputs: GetCommentsInput, context: Context) -> GetCo
     except ValidationError as ve:
         logger.error(f"Input validation error in get_page_comments: {ve.errors()}", exc_info=True)
         error_details = ", ".join([f"{e['loc'][0]}: {e['msg']}" for e in ve.errors()])
-        raise McpError(code=-32602, message=f"Invalid parameters: {error_details}")
+        raise McpError(ErrorData(code=-32602, message=f"Invalid parameters: {error_details}"))
     except Exception as e:
         logger.error(f"Unexpected error in get_page_comments: {e}", exc_info=True)
-        raise McpError(code=-32000, message=f"Tool execution error: {e}")
+        raise McpError(ErrorData(code=-32000, message=f"Tool execution error: {e}"))
 
 # --- MCP Server Setup ---
 def create_mcp_server() -> FastMCP:
@@ -276,7 +274,7 @@ if __name__ == "__main__":
         asyncio.run(server_to_run.serve(host=mcp_host, port=mcp_port))
         
     except McpError as e:
-        logger.critical(f"Failed to start MCP server due to McpError: {e.message} (Code: {e.code})", exc_info=True)
+        logger.critical(f"Failed to start MCP server due to McpError: {e.error.message} (Code: {e.error.code})", exc_info=True)
     except Exception as e:
         logger.critical(f"An unexpected error occurred while trying to start or run the MCP server: {e}", exc_info=True)
     finally:

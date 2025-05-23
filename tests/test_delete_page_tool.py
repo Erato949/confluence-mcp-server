@@ -6,7 +6,7 @@ import httpx # For creating mock response
 import os
 
 from fastmcp import Client
-from fastmcp.exceptions import McpError # For asserting expected errors
+from fastmcp.exceptions import ToolError # For asserting expected errors
 
 # Schemas defined in our project for tool input/output
 from confluence_mcp_server.mcp_actions.schemas import DeletePageOutput, DeletePageInput
@@ -30,7 +30,7 @@ async def test_delete_page_success(
     
     # Using client.call_tool
     # It directly returns the "result" part of the JSON-RPC response
-    # or raises an McpError if the server returns a JSON-RPC error.
+    # or raises a ToolError if the server returns a JSON-RPC error.
     result_content_list = await mcp_client.call_tool(
         "delete_confluence_page",  # Tool name
         {"inputs": request_params}  # Wrap params under 'inputs' key
@@ -57,7 +57,7 @@ async def test_delete_page_success(
     # mock_httpx_async_client.delete.assert_awaited_once_with(expected_url)
 
 # TODO: Add more test cases:
-# - test_delete_page_not_found (API returns 404, tool should raise McpError via HTTPException)
-# - test_delete_page_api_error (API returns 500, tool should raise McpError via HTTPException)
-# - test_delete_page_invalid_input_missing_page_id (tool should raise McpError for validation)
-# - test_delete_page_invalid_input_wrong_type (tool should raise McpError for validation)
+# - test_delete_page_not_found (API returns 404, tool should raise ToolError via HTTPException)
+# - test_delete_page_api_error (API returns 500, tool should raise ToolError via HTTPException)
+# - test_delete_page_invalid_input_missing_page_id (tool should raise ToolError for validation)
+# - test_delete_page_invalid_input_wrong_type (tool should raise ToolError for validation)
