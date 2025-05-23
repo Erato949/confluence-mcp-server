@@ -1,10 +1,12 @@
 {
   "mcpServers": {
     "confluence-mcp": {
-      "command": "python",
+      "command": "C:\\Users\\chris\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\confluence-mcp-server-claude-iS1eipKk-py3.10\\Scripts\\python.exe",
       "args": [
-        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/confluence_mcp_server/main.py"
+        "-m",
+        "confluence_mcp_server.main"
       ],
+      "cwd": "C:/Users/chris/Documents/Confluence-MCP-Server_Claude",
       "env": {
         "CONFLUENCE_URL": "https://feedbackloopai.atlassian.net/wiki/",
         "CONFLUENCE_USERNAME": "chughes@feedbackloopai.ai",
