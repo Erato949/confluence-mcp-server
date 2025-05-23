@@ -49,13 +49,14 @@ def create_claude_config():
         config["mcpServers"] = {}
     
     # Add or update Confluence MCP server configuration
+    # 🔒 SECURITY: Using placeholder values - NEVER commit real credentials
     config["mcpServers"]["confluence-mcp"] = {
         "command": "python",
         "args": [str(main_py_path)],
         "env": {
-            "CONFLUENCE_URL": "https://feedbackloopai.atlassian.net/wiki/",
-            "CONFLUENCE_USERNAME": "chughes@feedbackloopai.ai", 
-            "CONFLUENCE_API_TOKEN": "ATATT3xFfGF0HrFAZ3elRO5Bv06hTNVAh8PU7OIz-gK3YV0q1m4nzvoQFuyfGDJBclKMP2hj7IJvBotMrBiePPsDusoW8RxHvhi1nqJG0vyK5YCySq76IbPkotFTQi3nHVRDqtZD49uhkJ5JnjmVN02FBvGv5yxHL_YqFeUxt2YacAKrJrvo3Mg=32162271"
+            "CONFLUENCE_URL": "https://your-domain.atlassian.net/wiki/",
+            "CONFLUENCE_USERNAME": "your-email@example.com", 
+            "CONFLUENCE_API_TOKEN": "YOUR_API_TOKEN_HERE"
         }
     }
     

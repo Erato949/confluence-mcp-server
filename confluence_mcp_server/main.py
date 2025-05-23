@@ -518,6 +518,13 @@ if __name__ == "__main__":
         logger.info(f"CONFLUENCE_URL: {os.getenv('CONFLUENCE_URL')}")
         logger.info(f"CONFLUENCE_USERNAME: {os.getenv('CONFLUENCE_USERNAME')}")
         
+        # 🔒 SECURITY: Never log API tokens - only confirm they exist
+        api_token = os.getenv("CONFLUENCE_API_TOKEN")
+        if api_token:
+            logger.info("CONFLUENCE_API_TOKEN: ******* (loaded successfully)")
+        else:
+            logger.error("CONFLUENCE_API_TOKEN: Not found in environment variables")
+        
         # Start the MCP server using stdio transport (required by Claude Desktop)
         # This creates a JSON-RPC interface on stdout/stdin
         mcp_server.run()
