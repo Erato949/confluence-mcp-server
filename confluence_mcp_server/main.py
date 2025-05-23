@@ -93,7 +93,7 @@ async def search_confluence_pages(inputs: SearchPagesInput, context: Context) ->
     logger.info(f"Executing search_confluence_pages tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await page_actions.search_pages_logic(client, inputs, context)
+            return await page_actions.search_pages_logic(client, inputs)
     except McpError:
         raise
     except ValidationError as ve:
@@ -127,7 +127,7 @@ async def update_confluence_page(inputs: UpdatePageInput, context: Context) -> U
     logger.info(f"Executing update_confluence_page tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await page_actions.update_page_logic(client, inputs, context)
+            return await page_actions.update_page_logic(client, inputs)
     except McpError:
         raise
     except ValidationError as ve:
@@ -164,7 +164,7 @@ async def get_confluence_spaces(inputs: GetSpacesInput, context: Context) -> Get
     logger.info(f"Executing get_confluence_spaces tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await space_actions.get_spaces_logic(client, inputs, context)
+            return await space_actions.get_spaces_logic(client, inputs)  # Removed context
     except McpError:
         raise
     except ValidationError as ve:
@@ -181,7 +181,7 @@ async def get_page_attachments(inputs: GetAttachmentsInput, context: Context) ->
     logger.info(f"Executing get_page_attachments tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await attachment_actions.get_attachments_logic(client, inputs, context)
+            return await attachment_actions.get_attachments_logic(client, inputs)  # Removed context
     except McpError:
         raise
     except ValidationError as ve:
@@ -198,7 +198,7 @@ async def add_page_attachment(inputs: AddAttachmentInput, context: Context) -> A
     logger.info(f"Executing add_page_attachment tool with inputs: {{page_id: {inputs.page_id}, filename: {inputs.filename}, media_type: {inputs.media_type}, comment: {inputs.comment}, content_length: {inputs.content_length}}}") # Avoid logging potentially large content
     try:
         async with get_confluence_client() as client:
-            return await attachment_actions.add_attachment_logic(client, inputs, context)
+            return await attachment_actions.add_attachment_logic(client, inputs)  # Removed context
     except McpError:
         raise
     except ValidationError as ve:
@@ -215,7 +215,7 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput, context: Context
     logger.info(f"Executing delete_page_attachment tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await attachment_actions.delete_attachment_logic(client, inputs, context)
+            return await attachment_actions.delete_attachment_logic(client, inputs)  # Removed context
     except McpError:
         raise
     except ValidationError as ve:
@@ -232,7 +232,7 @@ async def get_page_comments(inputs: GetCommentsInput, context: Context) -> GetCo
     logger.info(f"Executing get_page_comments tool with inputs: {inputs}")
     try:
         async with get_confluence_client() as client:
-            return await comment_actions.get_comments_logic(client, inputs, context)
+            return await comment_actions.get_comments_logic(client, inputs)  # Removed context
     except McpError:
         raise
     except ValidationError as ve:
@@ -262,16 +262,14 @@ if __name__ == "__main__":
 
     logger.info("Starting Confluence MCP Server...")
 
-    mcp_port = int(os.getenv("MCP_PORT", "8077"))
-    mcp_host = os.getenv("MCP_HOST", "0.0.0.0")
-
     try:
-        # The mcp_server instance is now created globally and configured with tools.
-        # create_mcp_server() simply returns this instance.
+        # For Claude Desktop compatibility, use stdio transport by default
+        # The mcp_server instance is created globally and configured with tools.
         server_to_run = create_mcp_server()
-        logger.info(f"FastMCP server retrieved. Attempting to serve on {mcp_host}:{mcp_port}")
+        logger.info("FastMCP server retrieved. Starting with stdio transport for Claude Desktop compatibility")
         
-        asyncio.run(server_to_run.serve(host=mcp_host, port=mcp_port))
+        # Use the standard FastMCP run method with stdio transport (Claude Desktop standard)
+        server_to_run.run()
         
     except McpError as e:
         logger.critical(f"Failed to start MCP server due to McpError: {e.error.message} (Code: {e.error.code})", exc_info=True)

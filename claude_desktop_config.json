@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "confluence-mcp": {
+      "command": "python",
+      "args": [
+        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/confluence_mcp_server/main.py"
+      ],
+      "env": {
+        "CONFLUENCE_URL": "https://your-org.atlassian.net",
+        "CONFLUENCE_USERNAME": "your-email@domain.com",
+        "CONFLUENCE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+} 
