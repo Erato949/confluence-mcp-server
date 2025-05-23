@@ -19,24 +19,19 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from dotenv import load_dotenv
-
-# FastMCP and MCP Imports
-from mcp.types import JSONRPCMessage
-
-# Local imports - reuse the existing MCP server instance
-from confluence_mcp_server.main import mcp_server
+import httpx
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 class HttpTransport:
-    """HTTP transport adapter for FastMCP server."""
+    """HTTP transport adapter for MCP server with lazy loading."""
     
     def __init__(self):
         self.app = FastAPI(
             title="Confluence MCP Server",
             description="HTTP transport for Confluence MCP Server - Compatible with Smithery.ai",
-            version="1.0.0"
+            version="1.1.0"
         )
         self.setup_routes()
         self.setup_middleware()
@@ -111,16 +106,17 @@ class HttpTransport:
         @self.app.get("/")
         async def root():
             """Root endpoint with server information."""
-            tools = await mcp_server._mcp_list_tools()
+            tools_response = await self._get_tools_list()
+            tools_count = len(tools_response.get("result", {}).get("tools", []))
             return {
                 "name": "Confluence MCP Server",
-                "version": "1.0.0",
+                "version": "1.1.0",
                 "transport": "http",
                 "endpoints": {
                     "mcp": "/mcp",
                     "health": "/health"
                 },
-                "tools_count": len(tools)
+                "tools_count": tools_count
             }
     
     def _decode_config(self, config: str) -> Dict[str, Any]:
@@ -296,11 +292,8 @@ class HttpTransport:
             }
     
     async def _process_mcp_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
-        """Process MCP JSON-RPC message through FastMCP server."""
+        """Process MCP JSON-RPC message."""
         try:
-            # Create a mock stdio transport for processing
-            # This bridges HTTP requests to the FastMCP server
-            
             if message.get("method") == "tools/list":
                 return await self._handle_tools_list(message)
             elif message.get("method") == "tools/call":
@@ -349,6 +342,29 @@ class HttpTransport:
                 }
             }
     
+    async def _get_confluence_client(self) -> httpx.AsyncClient:
+        """Create authenticated Confluence client."""
+        confluence_url = os.getenv("CONFLUENCE_URL")
+        username = os.getenv("CONFLUENCE_USERNAME") 
+        api_token = os.getenv("CONFLUENCE_API_TOKEN")
+        
+        if not all([confluence_url, username, api_token]):
+            raise HTTPException(status_code=400, detail="Missing Confluence credentials")
+        
+        base_url = confluence_url.rstrip('/')
+        
+        client = httpx.AsyncClient(
+            base_url=base_url,
+            auth=(username, api_token),
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            timeout=30.0
+        )
+        
+        return client
+    
     async def _handle_tool_call(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle tools/call requests."""
         try:
@@ -356,31 +372,89 @@ class HttpTransport:
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
             
-            # Get tools from FastMCP server
-            tools = await mcp_server._mcp_list_tools()
-            tool_map = {tool.name: tool for tool in tools}
-            
-            if tool_name not in tool_map:
+            # Import tool logic only when needed (lazy loading)
+            try:
+                from confluence_mcp_server.mcp_actions import page_actions, space_actions, attachment_actions, comment_actions
+            except ImportError as e:
                 return {
                     "jsonrpc": "2.0",
                     "id": message.get("id"),
                     "error": {
-                        "code": -32602,
-                        "message": f"Unknown tool: {tool_name}"
+                        "code": -32603,
+                        "message": f"Failed to load tool actions: {str(e)}"
                     }
                 }
             
-            # Execute the tool through FastMCP's call mechanism
+            # Execute tool based on name
             try:
-                # Use FastMCP's internal tool calling mechanism
-                # FastMCP expects arguments to be wrapped in an 'inputs' object
-                wrapped_arguments = {"inputs": arguments}
-                result = await mcp_server._mcp_call_tool(tool_name, wrapped_arguments)
+                async with await self._get_confluence_client() as client:
+                    if tool_name == "get_confluence_page":
+                        from confluence_mcp_server.mcp_actions.schemas import GetPageInput
+                        inputs = GetPageInput(**arguments)
+                        result = await page_actions.get_page_logic(client, inputs)
+                    elif tool_name == "search_confluence_pages":
+                        from confluence_mcp_server.mcp_actions.schemas import SearchPagesInput
+                        inputs = SearchPagesInput(**arguments)
+                        result = await page_actions.search_pages_logic(client, inputs)
+                    elif tool_name == "create_confluence_page":
+                        from confluence_mcp_server.mcp_actions.schemas import CreatePageInput
+                        inputs = CreatePageInput(**arguments)
+                        result = await page_actions.create_page_logic(client, inputs)
+                    elif tool_name == "update_confluence_page":
+                        from confluence_mcp_server.mcp_actions.schemas import UpdatePageInput
+                        inputs = UpdatePageInput(**arguments)
+                        result = await page_actions.update_page_logic(client, inputs)
+                    elif tool_name == "delete_confluence_page":
+                        from confluence_mcp_server.mcp_actions.schemas import DeletePageInput
+                        inputs = DeletePageInput(**arguments)
+                        result = await page_actions.delete_page_logic(client, inputs)
+                    elif tool_name == "get_confluence_spaces":
+                        from confluence_mcp_server.mcp_actions.schemas import GetSpacesInput
+                        inputs = GetSpacesInput(**arguments)
+                        result = await space_actions.get_spaces_logic(client, inputs)
+                    elif tool_name == "get_page_attachments":
+                        from confluence_mcp_server.mcp_actions.schemas import GetAttachmentsInput
+                        inputs = GetAttachmentsInput(**arguments)
+                        result = await attachment_actions.get_attachments_logic(client, inputs)
+                    elif tool_name == "add_page_attachment":
+                        from confluence_mcp_server.mcp_actions.schemas import AddAttachmentInput
+                        inputs = AddAttachmentInput(**arguments)
+                        result = await attachment_actions.add_attachment_logic(client, inputs)
+                    elif tool_name == "delete_page_attachment":
+                        from confluence_mcp_server.mcp_actions.schemas import DeleteAttachmentInput
+                        inputs = DeleteAttachmentInput(**arguments)
+                        result = await attachment_actions.delete_attachment_logic(client, inputs)
+                    elif tool_name == "get_page_comments":
+                        from confluence_mcp_server.mcp_actions.schemas import GetCommentsInput
+                        inputs = GetCommentsInput(**arguments)
+                        result = await comment_actions.get_comments_logic(client, inputs)
+                    else:
+                        return {
+                            "jsonrpc": "2.0",
+                            "id": message.get("id"),
+                            "error": {
+                                "code": -32602,
+                                "message": f"Unknown tool: {tool_name}"
+                            }
+                        }
+                
+                # Convert result to dict if it's a Pydantic model
+                if hasattr(result, 'model_dump'):
+                    result_dict = result.model_dump()
+                else:
+                    result_dict = result
                 
                 return {
                     "jsonrpc": "2.0",
                     "id": message.get("id"),
-                    "result": result
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(result_dict, indent=2)
+                            }
+                        ]
+                    }
                 }
                 
             except Exception as tool_error:
