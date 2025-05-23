@@ -150,20 +150,133 @@ class HttpTransport:
             logger.error(f"Failed to apply config: {str(e)}")
     
     async def _get_tools_list(self) -> Dict[str, Any]:
-        """Get list of available tools for lazy loading."""
+        """Get list of available tools for lazy loading (no authentication required)."""
         try:
-            # Get tools from FastMCP server using the correct method
-            tools = await mcp_server._mcp_list_tools()
-            
-            # Convert to the expected format
-            tools_list = []
-            for tool in tools:
-                tool_metadata = {
-                    "name": tool.name,
-                    "description": tool.description or f"Execute {tool.name}",
-                    "inputSchema": tool.inputSchema
+            # Static tool definitions for lazy loading - no Confluence connection needed
+            tools_list = [
+                {
+                    "name": "get_confluence_page",
+                    "description": "Retrieve a Confluence page by ID or URL with full content and metadata",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Confluence page ID"},
+                            "page_url": {"type": "string", "description": "Confluence page URL"},
+                            "expand": {"type": "string", "description": "Comma-separated list of properties to expand"}
+                        }
+                    }
+                },
+                {
+                    "name": "search_confluence_pages",
+                    "description": "Search for Confluence pages using CQL (Confluence Query Language)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "cql": {"type": "string", "description": "CQL query string"},
+                            "limit": {"type": "integer", "description": "Maximum number of results"},
+                            "start": {"type": "integer", "description": "Starting index for pagination"}
+                        },
+                        "required": ["cql"]
+                    }
+                },
+                {
+                    "name": "create_confluence_page",
+                    "description": "Create a new Confluence page in a specified space",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "space_key": {"type": "string", "description": "Space key where to create the page"},
+                            "title": {"type": "string", "description": "Page title"},
+                            "content": {"type": "string", "description": "Page content in Confluence storage format"},
+                            "parent_id": {"type": "string", "description": "Parent page ID (optional)"}
+                        },
+                        "required": ["space_key", "title", "content"]
+                    }
+                },
+                {
+                    "name": "update_confluence_page",
+                    "description": "Update an existing Confluence page",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Page ID to update"},
+                            "title": {"type": "string", "description": "New page title"},
+                            "content": {"type": "string", "description": "New page content in Confluence storage format"},
+                            "version_number": {"type": "integer", "description": "Current version number"}
+                        },
+                        "required": ["page_id", "title", "content"]
+                    }
+                },
+                {
+                    "name": "delete_confluence_page",
+                    "description": "Delete a Confluence page (moves to trash)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Page ID to delete"}
+                        },
+                        "required": ["page_id"]
+                    }
+                },
+                {
+                    "name": "get_confluence_spaces",
+                    "description": "List available Confluence spaces with metadata",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "limit": {"type": "integer", "description": "Maximum number of spaces to return"},
+                            "start": {"type": "integer", "description": "Starting index for pagination"}
+                        }
+                    }
+                },
+                {
+                    "name": "get_page_attachments",
+                    "description": "Get list of attachments for a Confluence page",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Page ID to get attachments from"}
+                        },
+                        "required": ["page_id"]
+                    }
+                },
+                {
+                    "name": "add_page_attachment",
+                    "description": "Add an attachment to a Confluence page",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Page ID to attach file to"},
+                            "file_path": {"type": "string", "description": "Local path to file to upload"},
+                            "comment": {"type": "string", "description": "Optional comment for the attachment"}
+                        },
+                        "required": ["page_id", "file_path"]
+                    }
+                },
+                {
+                    "name": "delete_page_attachment",
+                    "description": "Delete an attachment from a Confluence page",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "attachment_id": {"type": "string", "description": "Attachment ID to delete"}
+                        },
+                        "required": ["attachment_id"]
+                    }
+                },
+                {
+                    "name": "get_page_comments",
+                    "description": "Get comments for a Confluence page",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "page_id": {"type": "string", "description": "Page ID to get comments from"},
+                            "expand": {"type": "string", "description": "Comma-separated list of properties to expand"}
+                        },
+                        "required": ["page_id"]
+                    }
                 }
-                tools_list.append(tool_metadata)
+            ]
             
             return {
                 "jsonrpc": "2.0",
@@ -216,22 +329,13 @@ class HttpTransport:
     async def _handle_tools_list(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle tools/list requests."""
         try:
-            tools = await mcp_server._mcp_list_tools()
-            tools_list = []
-            for tool in tools:
-                tool_data = {
-                    "name": tool.name,
-                    "description": tool.description or f"Execute {tool.name}",
-                    "inputSchema": tool.inputSchema
-                }
-                tools_list.append(tool_data)
+            # Use the same static tool definitions as _get_tools_list
+            tools_response = await self._get_tools_list()
             
             return {
                 "jsonrpc": "2.0",
                 "id": message.get("id"),
-                "result": {
-                    "tools": tools_list
-                }
+                "result": tools_response["result"]
             }
             
         except Exception as e:
