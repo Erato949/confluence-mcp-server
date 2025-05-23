@@ -1,49 +1,50 @@
 # Confluence MCP Server
 
-![Release](https://img.shields.io/badge/release-v1.0.0-green.svg) ![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Release](https://img.shields.io/badge/release-v1.1.0-green.svg) ![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Platform](https://img.shields.io/badge/platform-universal-blue.svg)
 
-An MCP (Model Context Protocol) server for Confluence integration, built with FastMCP. This server provides LLMs like Claude with direct access to Confluence Cloud functionality through a standardized interface.
+A **universal, production-ready MCP (Model Context Protocol) server** for Confluence integration. Built with FastMCP, this server provides AI assistants like Claude with direct access to Confluence Cloud functionality through multiple transport protocols and deployment options.
+
+## 🌐 Universal Deployment Platform
+
+**NEW in v1.1.0**: Multi-platform support with HTTP transport alongside the original stdio transport.
+
+### 🚀 Deployment Options
+
+| Platform | Transport | Status | Use Case |
+|----------|-----------|--------|----------|
+| **Claude Desktop** | stdio | ✅ 100% Compatible | Local development, personal use |
+| **Smithery.ai** | HTTP | ✅ Production Ready | Cloud deployment, team sharing |
+| **Docker** | HTTP/stdio | ✅ Production Ready | Containerized deployment |
+| **Web Clients** | HTTP | ✅ Production Ready | Browser-based AI tools |
+| **Cloud Platforms** | HTTP | ✅ Production Ready | Railway, Heroku, AWS, etc. |
 
 ## ✨ Features
 
 - **Complete Page Management**: Create, read, update, delete Confluence pages
-- **Search & Discovery**: Search pages with CQL (Confluence Query Language)
-- **Space Management**: List and explore Confluence spaces
-- **Attachment Handling**: Upload and manage page attachments
-- **Comment System**: Access and manage page comments
-- **Claude Desktop Ready**: Optimized for seamless Claude Desktop integration
+- **Advanced Search**: Search pages with CQL (Confluence Query Language) support
+- **Space Management**: List and explore Confluence spaces with permissions
+- **Attachment Handling**: Upload, download, and manage page attachments
+- **Comment System**: Access and manage page comments and discussions
+- **Multi-Transport**: stdio (Claude Desktop) + HTTP (web/cloud platforms)
+- **Universal Launcher**: Auto-detects best transport mode for your environment
+- **Production Ready**: Comprehensive error handling, logging, and monitoring
 
-## 🔧 Claude Desktop Integration
+## 🚀 Quick Start
 
-### Quick Setup (Recommended)
+### Option 1: Claude Desktop (stdio transport)
 
 1. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Run Setup Script**:
-   ```bash
-   python setup_claude_desktop.py
-   ```
-
-3. **Configure Credentials**: Edit the generated configuration file with your Confluence details
-
-4. **Restart Claude Desktop** and look for the 🔨 hammer icon
-
-### Manual Setup
-
-1. **Locate Claude Desktop Config**:
-   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. **Add Server Configuration**:
+2. **Configure Claude Desktop**:
    ```json
    {
      "mcpServers": {
-       "confluence-mcp": {
+       "confluence": {
          "command": "python",
-         "args": ["/ABSOLUTE/PATH/TO/YOUR/PROJECT/confluence_mcp_server/main.py"],
+         "args": ["-m", "confluence_mcp_server.main"],
          "env": {
            "CONFLUENCE_URL": "https://your-org.atlassian.net",
            "CONFLUENCE_USERNAME": "your-email@domain.com",
@@ -54,14 +55,71 @@ An MCP (Model Context Protocol) server for Confluence integration, built with Fa
    }
    ```
 
-3. **Get Confluence API Token**:
-   - Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
-   - Create API Token
-   - Copy the token to your configuration
+3. **Restart Claude Desktop** and look for the 🔨 hammer icon
 
-### 🚀 Available Tools in Claude Desktop
+### Option 2: HTTP Server (new in v1.1.0)
 
-Once connected, Claude will have access to these tools:
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Set Environment Variables**:
+   ```bash
+   export CONFLUENCE_URL="https://your-org.atlassian.net"
+   export CONFLUENCE_USERNAME="your-email@domain.com"
+   export CONFLUENCE_API_TOKEN="your-api-token"
+   ```
+
+3. **Start HTTP Server**:
+   ```bash
+   python -m confluence_mcp_server.server_http
+   ```
+
+4. **Test the Server**:
+   ```bash
+   curl http://localhost:8000/health
+   # Returns: {"status": "healthy", "transport": "http"}
+   ```
+
+### Option 3: Docker Deployment (new in v1.1.0)
+
+1. **Build Container**:
+   ```bash
+   docker build -t confluence-mcp-server .
+   ```
+
+2. **Run Container**:
+   ```bash
+   docker run -p 8000:8000 \
+     -e CONFLUENCE_URL="https://your-org.atlassian.net" \
+     -e CONFLUENCE_USERNAME="your-email@domain.com" \
+     -e CONFLUENCE_API_TOKEN="your-api-token" \
+     confluence-mcp-server
+   ```
+
+### Option 4: Universal Launcher (new in v1.1.0)
+
+The universal launcher automatically detects the best transport mode:
+
+```bash
+# Auto-detect transport mode
+python -m confluence_mcp_server.launcher
+
+# Force specific mode
+python -m confluence_mcp_server.launcher --http --port 9000
+python -m confluence_mcp_server.launcher --stdio
+```
+
+### Option 5: Smithery.ai Deployment (new in v1.1.0)
+
+1. **Upload Files**: Upload `smithery.yaml` and server code to Smithery.ai
+2. **Configure Credentials**: Set Confluence URL, username, and API token
+3. **Deploy**: Smithery.ai handles the rest automatically
+
+## 🛠️ Available Tools
+
+All 10 Confluence tools work across **all transport modes** (stdio and HTTP):
 
 | Tool | Description | Example Usage |
 |------|-------------|---------------|
@@ -76,13 +134,45 @@ Once connected, Claude will have access to these tools:
 | `delete_page_attachment` | Remove files | "Delete the old attachment from page 123456" |
 | `get_page_comments` | Read page comments | "Show me comments on page 123456" |
 
-### 💬 Example Claude Conversations
+## 🌐 HTTP API Endpoints (v1.1.0)
 
-**Creating a Page**:
+The HTTP transport provides these endpoints for web integration:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Server information and tool count |
+| `/health` | GET | Health check and status |
+| `/mcp` | GET | List available tools (lazy loading) |
+| `/mcp` | POST | Execute tools via JSON-RPC 2.0 |
+| `/mcp` | DELETE | Session cleanup |
+
+### Example HTTP Usage
+
+```bash
+# List available tools
+curl http://localhost:8000/mcp
+
+# Execute a tool via JSON-RPC
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_confluence_spaces",
+      "arguments": {"limit": 10}
+    }
+  }'
+```
+
+## 💬 Example AI Assistant Conversations
+
+**Creating a Page** (works on all platforms):
 ```
 You: Create a new project kickoff page in the ENGINEERING space with a basic template
 
-Claude: I'll create a project kickoff page for you in the ENGINEERING space...
+AI: I'll create a project kickoff page for you in the ENGINEERING space...
 [Uses create_confluence_page tool]
 ✅ Created "Project Kickoff" page (ID: 789123) in ENGINEERING space
 ```
@@ -91,102 +181,197 @@ Claude: I'll create a project kickoff page for you in the ENGINEERING space...
 ```
 You: Find all pages mentioning "API documentation" that were updated this month
 
-Claude: I'll search for pages with "API documentation" updated recently...
+AI: I'll search for pages with "API documentation" updated recently...
 [Uses search_confluence_pages tool]
 📄 Found 5 pages matching your criteria...
 ```
 
-### 🔧 Compatibility & Requirements
+## 🔧 Configuration Options
 
-- **MCP Protocol**: Latest version supported (FastMCP 2.4.0)
-- **Transport**: Stdio (Claude Desktop standard)
-- **Python**: 3.10+
-- **Claude Desktop**: Windows/macOS versions with MCP support
-- **Confluence**: Cloud instances with API access
+### Environment Variables (all platforms)
+```bash
+CONFLUENCE_URL=https://your-org.atlassian.net
+CONFLUENCE_USERNAME=your-email@domain.com
+CONFLUENCE_API_TOKEN=your-api-token
+```
 
-### ⚠️ No Anticipated Connection Issues
+### .env File Support
+```env
+# .env file in project root
+CONFLUENCE_URL=https://your-org.atlassian.net
+CONFLUENCE_USERNAME=your-email@domain.com
+CONFLUENCE_API_TOKEN=your-api-token
+```
 
-This server has been specifically designed for Claude Desktop compatibility:
+### Smithery.ai Configuration
+The server automatically handles base64-encoded configuration from Smithery.ai platform.
 
-✅ **Standard Transport**: Uses stdio transport (not HTTP/SSE)  
-✅ **Latest MCP Protocol**: FastMCP 2.4.0 with full Claude Desktop support  
-✅ **Consistent Tool Signatures**: All tools follow the same input/output pattern  
-✅ **Proper Error Handling**: MCP-compliant error formatting  
-✅ **Tested Integration**: Comprehensive test suite ensures reliability  
-✅ **Recently Validated**: Successfully tested with real Confluence instances (January 2025)
+## 🔒 Security & Authentication
 
-### 🐛 Troubleshooting
+- **API Tokens**: Secure token-based authentication with Confluence
+- **HTTPS Only**: All API requests use encrypted connections
+- **Permission Inheritance**: Server inherits your Confluence user permissions
+- **No Data Storage**: Direct API passthrough, no local data retention
+- **Container Security**: Non-root user, minimal attack surface
 
-**Claude Desktop doesn't show the hammer icon:**
-- Verify the configuration file path and syntax
-- Check that Python is in your system PATH
-- Restart Claude Desktop completely
-- Check Claude Desktop logs for error messages
+### Getting Confluence API Token
 
-**"Permission denied" or "Authentication failed":**
-- Verify your Confluence URL (include https://)
-- Check API token is correct and hasn't expired
-- Ensure your username is the email associated with your Atlassian account
-- Test credentials with: `curl -u email:token https://your-org.atlassian.net/rest/api/space`
+1. Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Click "Create API Token"
+3. Copy the generated token
+4. Use your email address as the username
 
-**Tools appear but fail to execute:**
-- Check environment variables are properly set in Claude config
-- Verify network connectivity to your Confluence instance
-- Review server logs in Claude Desktop for specific error messages
+## 🧪 Testing & Validation
 
-**"Module not found" errors:**
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Verify Python path in Claude Desktop config points to correct environment
-- Use absolute paths in the configuration
-
-## 🔒 Security Considerations
-
-- **API Tokens**: Stored in Claude Desktop config (local machine only)
-- **Network Access**: All requests use HTTPS to Confluence Cloud
-- **Permissions**: Inherits your Confluence user permissions
-- **Local Only**: No data sent to third parties, direct Confluence API calls
-
-## 📖 Development
-
-### Running Tests
+### Run Test Suite
 ```bash
 # Run all tests
 python -m pytest tests/ -v
 
-# Run only passing asyncio tests (recommended)
-python -m pytest tests/ -k asyncio
+# Test HTTP transport specifically
+python -m pytest tests/test_http_transport.py -v
+
+# Test specific functionality
+python -m pytest tests/ -k "test_get_page"
 ```
+
+### Validate Dependencies
+```bash
+python -c "
+import fastmcp, fastapi, uvicorn, pytest_asyncio;
+print('✅ All dependencies working correctly')
+"
+```
+
+### Health Checks
+```bash
+# stdio transport (Claude Desktop)
+python -c "import confluence_mcp_server.main; print('✅ stdio transport ready')"
+
+# HTTP transport
+python -m confluence_mcp_server.server_http &
+curl http://localhost:8000/health
+```
+
+## 🔄 Migration from v1.0.x
+
+**100% Backward Compatible** - no changes needed for existing Claude Desktop setups.
+
+New capabilities in v1.1.0:
+- ✅ HTTP transport for web/cloud deployment
+- ✅ Docker containerization
+- ✅ Smithery.ai integration
+- ✅ Universal launcher
+- ✅ Enhanced configuration management
+- ✅ Production monitoring and health checks
+
+## 🐛 Troubleshooting
+
+### Claude Desktop Issues
+- **No hammer icon**: Check config file syntax and restart Claude Desktop
+- **Authentication fails**: Verify API token and Confluence URL
+- **Tools fail**: Check environment variables and network connectivity
+
+### HTTP Server Issues
+- **Port conflicts**: Use `--port` flag to specify different port
+- **CORS errors**: Server includes CORS middleware for web clients
+- **Tool execution fails**: Check environment variables and Confluence permissions
+
+### Docker Issues
+- **Container won't start**: Check environment variables are properly set
+- **Health check fails**: Verify Confluence connectivity from container
+- **Permission errors**: Container runs as non-root user by default
+
+### General Debugging
+```bash
+# Enable debug logging
+export LOG_LEVEL=DEBUG
+python -m confluence_mcp_server.launcher
+
+# Test Confluence connectivity
+curl -u email:token https://your-org.atlassian.net/rest/api/space
+```
+
+## 📦 Production Deployment
+
+### Cloud Platforms
+
+**Railway**:
+```bash
+# Deploy directly from GitHub
+railway login
+railway link
+railway up
+```
+
+**Heroku**:
+```bash
+# Use included Dockerfile
+heroku container:push web
+heroku container:release web
+```
+
+**AWS/GCP/Azure**:
+- Use Docker image for container services
+- Set environment variables in platform configuration
+- Use health check endpoint `/health` for monitoring
+
+### Monitoring
+
+The HTTP server provides monitoring endpoints:
+- **Health**: `GET /health` - Server status
+- **Metrics**: `GET /` - Tool count and server info
+- **Logs**: Structured logging for debugging and monitoring
+
+## 🤝 Development
 
 ### Project Structure
 ```
 confluence_mcp_server/
-├── main.py                 # MCP server entry point
+├── main.py                 # stdio transport (Claude Desktop)
+├── server_http.py          # HTTP transport (web/cloud)
+├── launcher.py             # Universal launcher
 ├── mcp_actions/           # Tool implementations
-│   ├── page_actions.py    # Page-related tools
-│   ├── space_actions.py   # Space-related tools
-│   ├── attachment_actions.py
-│   ├── comment_actions.py
-│   └── schemas.py         # Pydantic models
+│   ├── page_actions.py    # Page management
+│   ├── space_actions.py   # Space operations
+│   ├── attachment_actions.py # File handling
+│   ├── comment_actions.py # Comments
+│   └── schemas.py         # Data models
 └── utils/
-    └── logging_config.py
+    └── logging_config.py  # Logging setup
 
 tests/                     # Comprehensive test suite
-claude_desktop_config.json # Configuration template
-setup_claude_desktop.py   # Automated setup script
+├── test_http_transport.py # HTTP transport tests
+└── test_*.py             # Tool-specific tests
+
+Dockerfile                 # Container configuration
+smithery.yaml             # Smithery.ai deployment
+pyproject.toml            # Package configuration
+requirements.txt          # Dependencies
 ```
 
-## 🤝 Contributing
+### Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+4. Ensure all tests pass (`pytest tests/ -v`)
+5. Test both stdio and HTTP transports
+6. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Ready to enhance your Confluence workflow with Claude? Run the setup script and start collaborating!** 🚀
+## 🚀 Ready to Get Started?
+
+Choose your deployment option:
+
+- **🖥️ Claude Desktop**: Use the stdio transport for local development
+- **🌐 Web/Cloud**: Use the HTTP transport for scalable deployment  
+- **🐳 Docker**: Use containers for consistent deployment
+- **⚡ Smithery.ai**: Use cloud platform for instant deployment
+
+**Transform your Confluence workflow with AI assistance today!** 🎉

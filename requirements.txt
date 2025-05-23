@@ -1,4 +1,4 @@
-# Confluence MCP Server v1.0.0 - Production Ready
+# Confluence MCP Server v1.1.0 - Universal Multi-Platform
 # Core dependencies for production deployment
 
 # Core MCP and API dependencies
@@ -19,4 +19,3 @@ black>=25.1.0
 flake8>=7.2.0
 mypy>=1.15.0
 pytest-mock>=3.14.0
-pytest-asyncio>=0.26.0
