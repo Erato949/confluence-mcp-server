@@ -42,7 +42,7 @@
 ### Phase 3: Test Implementation (PRIORITY 2)
 - [x] **T3.1**: Implement delete_page tool tests (1 test case complete: `test_delete_page_success` - PASSING)
 - [x] **T3.2**: Implement get_page tool tests (7 test cases completed: success by ID, success by space+title, not found, API error, invalid input variations, content expansion - ALL PASSING)
-- [ ] **T3.3**: Implement create_page tool tests
+- [x] **T3.3**: Implement create_page tool tests (9 test cases completed: success minimal, success with parent, title already exists error, space not found error, API error, connection error, MCP tool tests - ALL PASSING)
 - [ ] **T3.4**: Implement update_page tool tests
 - [ ] **T3.5**: Implement search_pages tool tests
 
@@ -125,21 +125,23 @@ Task is complete when:
 ## 📝 RECENT COMPLETION SUMMARY
 
 ### ✅ Session Accomplishments (Latest)
-- **Fixed get_page tool registration**: Removed incorrect context parameter from tool call
-- **Built comprehensive get_page tool tests**: 7 test cases covering all scenarios:
-  - ✅ Success by page_id
-  - ✅ Success by space_key + title  
-  - ✅ Page not found (404 error)
+- **Fixed create_page tool registration**: Removed incorrect context parameter from tool call (matching delete_page pattern)
+- **Built comprehensive create_page tool tests**: 9 test cases covering all scenarios:
+  - ✅ Success with minimal required fields
+  - ✅ Success with parent page specified
+  - ✅ Title already exists error (400 error)
+  - ✅ Space not found error (404 error)
   - ✅ API error (500 error)
-  - ✅ Invalid input (missing identifiers)
-  - ✅ Invalid input (conflicting identifiers)
-  - ✅ Content expansion functionality
-- **Fixed McpError constructor**: Updated all error handling to use proper ErrorData structure
-- **Verified existing functionality**: Confirmed delete_page tool still works correctly
-- **Test Suite Status**: 8/8 tests passing (asyncio backend)
+  - ✅ Connection error handling
+  - ✅ MCP tool interface tests (success, invalid input, API error)
+- **Fixed httpx.Response mocking**: Used proper httpx.Response objects instead of AsyncMock for realistic API responses
+- **Fixed URL generation**: Added proper _links.base field in mock responses for correct URL construction
+- **Fixed RequestError handling**: Created proper httpx.RequestError with request object for connection error tests
+- **Test Suite Status**: 9/9 create_page tests passing (asyncio backend), 17/17 total asyncio tests passing
 
 ### 🔧 Technical Fixes Applied
-1. **Tool Registration Fix**: `page_actions.get_page_logic(client, inputs)` (removed context)
-2. **Error Handling Fix**: `McpError(ErrorData(code=-32000, message="..."))` (proper constructor)
-3. **Test Framework**: Using ToolError for test assertions (FastMCP wraps errors)
-4. **Backend Configuration**: Restricted tests to asyncio only (avoid trio dependency issues)
+1. **Tool Registration Fix**: `page_actions.create_page_logic(client, inputs)` (removed context parameter)
+2. **Response Mocking**: Used `httpx.Response(201, request=..., json=data)` for realistic API responses
+3. **URL Generation**: Added `_links.base` field to mock responses for proper URL construction
+4. **Error Testing**: Created proper `httpx.RequestError("message", request=request)` for connection tests
+5. **Test Coverage**: Comprehensive error handling tests for all HTTP status codes and edge cases
