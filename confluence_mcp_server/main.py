@@ -57,6 +57,7 @@ async def get_confluence_client() -> httpx.AsyncClient:
     Raises:
         ToolError: If authentication credentials are missing or invalid
     """
+    # Retrieve required environment variables for Confluence API access
     confluence_url = os.getenv("CONFLUENCE_URL")
     username = os.getenv("CONFLUENCE_USERNAME") 
     api_token = os.getenv("CONFLUENCE_API_TOKEN")
@@ -64,18 +65,19 @@ async def get_confluence_client() -> httpx.AsyncClient:
     if not all([confluence_url, username, api_token]):
         raise ToolError("Missing Confluence credentials in environment variables")
     
-    # Remove trailing slash if present
+    # Normalize URL by removing trailing slash to ensure consistent API endpoint construction
     base_url = confluence_url.rstrip('/')
     
-    # Create the authenticated client
+    # Create authenticated HTTP client with Confluence-specific configuration
+    # Uses basic auth with username (email) and API token
     client = httpx.AsyncClient(
         base_url=base_url,
-        auth=(username, api_token),
+        auth=(username, api_token),  # Basic auth: username and API token
         headers={
             "Accept": "application/json",
             "Content-Type": "application/json"
         },
-        timeout=30.0
+        timeout=30.0  # 30 second timeout for API requests
     )
     
     return client
@@ -448,7 +450,10 @@ if __name__ == "__main__":
         import sys
         from pathlib import Path
         
-        # First check if environment variables are already set (e.g., from Claude Desktop)
+        # Environment variable loading strategy:
+        # 1. Check if already set (e.g., from Claude Desktop config)
+        # 2. Try loading from .env file in multiple locations
+        # 3. Fallback to default load_dotenv() behavior
         required_env_vars = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN"]
         already_set = all(os.getenv(var) for var in required_env_vars)
         
@@ -459,6 +464,7 @@ if __name__ == "__main__":
             logger.info("Environment variables not set, attempting to load from .env file")
             
             # Try multiple possible locations for .env file
+            # This handles different execution contexts (direct run vs module run)
             env_locations = [
                 # Current directory (when run from project root)
                 Path.cwd() / ".env",
@@ -471,7 +477,7 @@ if __name__ == "__main__":
             env_loaded = False
             for env_path in env_locations:
                 try:
-                    # Force load without checking existence (file might be hidden)
+                    # Force load without checking existence (file might be hidden by IDE)
                     result = load_dotenv(env_path)
                     if result:  # load_dotenv returns True if file was loaded
                         logger.info(f"Successfully loaded environment from: {env_path}")
@@ -485,10 +491,13 @@ if __name__ == "__main__":
             
             if not env_loaded:
                 # Final fallback - try load_dotenv() without path
+                # This lets python-dotenv search in its default locations
                 load_dotenv()
                 logger.info("Using fallback load_dotenv() without explicit path")
         
-        # Setup logging configuration (to file, not stderr)
+        # Setup logging configuration (file-based to avoid stdout interference)
+        # CRITICAL: All logging must go to files, not stdout/stderr
+        # Stdout interference breaks JSON-RPC protocol used by Claude Desktop
         try:
             setup_logging()
         except:
@@ -498,21 +507,23 @@ if __name__ == "__main__":
         # Validate environment variables are now available
         missing_vars = [var for var in required_env_vars if not os.getenv(var)]
         if missing_vars:
-            # Log but don't print to stderr
+            # Log but don't print to stderr (would interfere with MCP protocol)
             logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}")
             if not already_set:
                 logger.critical(f"Tried env file locations: {[str(p) for p in env_locations] if 'env_locations' in locals() else 'None'}")
             exit(1)
         
-        # Log successful environment loading
+        # Log successful environment loading for debugging
         logger.info(f"Environment variables loaded successfully")
         logger.info(f"CONFLUENCE_URL: {os.getenv('CONFLUENCE_URL')}")
         logger.info(f"CONFLUENCE_USERNAME: {os.getenv('CONFLUENCE_USERNAME')}")
         
-        # Start the MCP server (pure stdio, no extra output)
+        # Start the MCP server using stdio transport (required by Claude Desktop)
+        # This creates a JSON-RPC interface on stdout/stdin
         mcp_server.run()
         
     except Exception as e:
         # Log error but don't print to stderr to avoid interfering with MCP protocol
+        # All error output must go to log files only
         logger.critical(f"Critical error starting server: {str(e)}")
         exit(1)
