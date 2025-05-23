@@ -1,3 +1,6 @@
+# Confluence MCP Server v1.0.0 - Production Ready
+# Git ignore patterns for secure development
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

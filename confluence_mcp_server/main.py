@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Confluence MCP Server v1.0.0 - Production Ready
+A Model Context Protocol server for Confluence integration
+"""
+
 # confluence_mcp_server/main.py (CLEAN VERSION - NO STDOUT/STDERR INTERFERENCE)
 # Standard Library Imports
 import asyncio

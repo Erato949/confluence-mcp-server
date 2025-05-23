@@ -1,3 +1,8 @@
+"""
+Confluence MCP Server v1.0.0 - Production Ready
+Page Actions Module - Complete page management functionality
+"""
+
 # Logic for page-related Confluence tools
 import logging
 from typing import List, Optional, Union, Dict, Any

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Setup script for integrating Confluence MCP Server with Claude Desktop.
-This script helps configure Claude Desktop to use the Confluence MCP server.
+Confluence MCP Server v1.0.0 - Production Ready
+Claude Desktop Configuration Setup Script
 """
 
 import json

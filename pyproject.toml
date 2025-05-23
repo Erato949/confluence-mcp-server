@@ -9,9 +9,9 @@
     ]
 
 [tool.poetry]
-name = "confluence-mcp-server-claude"
-version = "0.1.0"
-description = "MCP server for Confluence Cloud API integration"
+name = "confluence-mcp-server"
+version = "1.0.0"
+description = "A Model Context Protocol (MCP) server for Confluence integration - Production Ready"
 authors = ["Erato949 <164182664+Erato949@users.noreply.github.com>"]
 readme = "README.md"
 packages = [
