@@ -450,13 +450,15 @@ async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
         raise ToolError(f"Failed to retrieve comments: {str(e)}")
 
 # --- Main Functions ---
-async def main():
-    """Main async function for stdio transport mode."""
+def main():
+    """Main function for stdio transport mode."""
     try:
-        # Environment setup
-        await setup_environment()
+        # Environment setup (convert to sync)
+        import asyncio
+        asyncio.run(setup_environment())
         
         # Start the MCP server using stdio transport
+        # Use synchronous run() method
         mcp_server.run()
         
     except Exception as e:
@@ -529,9 +531,10 @@ async def setup_environment():
     if missing_vars:
         # Log but don't print to stderr (would interfere with MCP protocol)
         logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}")
-        if not already_set:
-            logger.critical(f"Tried env file locations: {[str(p) for p in env_locations] if 'env_locations' in locals() else 'None'}")
-            raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
+        logger.critical(f"Tried env file locations: {[str(p) for p in env_locations] if 'env_locations' in locals() else 'None'}")
+        # Only raise error if we're sure the env vars should be available
+        # When run from Claude Desktop, they should be set via env config
+        raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
     
     # Log successful environment loading for debugging
     logger.info(f"Environment variables loaded successfully")
@@ -549,8 +552,8 @@ async def setup_environment():
 # --- Main Execution Block ---
 if __name__ == "__main__":
     try:
-        # Run the async main function
-        asyncio.run(main())
+        # Run the main function (now synchronous)
+        main()
         
     except Exception as e:
         # Log error but don't print to stderr to avoid interfering with MCP protocol
