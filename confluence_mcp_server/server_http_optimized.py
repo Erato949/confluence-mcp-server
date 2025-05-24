@@ -239,8 +239,14 @@ class UltraOptimizedHttpTransport:
     def _apply_config_async(self, config: str):
         """Apply base64 config from Smithery (non-blocking)."""
         try:
-            decoded = base64.b64decode(config).decode('utf-8')
-            config_data = json.loads(decoded)
+            # Handle different config formats that Smithery might send
+            if config.startswith('{'):
+                # Direct JSON string
+                config_data = json.loads(config)
+            else:
+                # Base64 encoded JSON
+                decoded = base64.b64decode(config).decode('utf-8')
+                config_data = json.loads(decoded)
             
             # Map Smithery config to environment variables
             env_mapping = {
@@ -252,8 +258,10 @@ class UltraOptimizedHttpTransport:
             for config_key, env_var in env_mapping.items():
                 if config_key in config_data:
                     os.environ[env_var] = config_data[config_key]
+                    logger.warning(f"SMITHERY_CONFIG: Set {env_var} from config")
                     
-        except Exception:
+        except Exception as e:
+            logger.warning(f"SMITHERY_CONFIG: Failed to parse config: {e}")
             pass  # Silent fail - never block tool listing
     
     async def _execute_tool(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -299,9 +307,14 @@ def create_app() -> FastAPI:
     transport = UltraOptimizedHttpTransport()
     return transport.app
 
-def run_server(host: str = "0.0.0.0", port: int = 8000):
+def run_server(host: str = "0.0.0.0", port: int = None):
     """Run the ultra-optimized HTTP server."""
+    # CRITICAL FIX: Use PORT environment variable as required by Smithery
+    if port is None:
+        port = int(os.getenv('PORT', 8000))
+    
     logger.warning(f"Starting Ultra-Optimized Confluence MCP Server on {host}:{port}")
+    logger.warning(f"PORT from environment: {os.getenv('PORT', 'not set, using default 8000')}")
     logger.warning("LAZY LOADING: Tool listing requires NO authentication")
     logger.warning("AUTHENTICATION: Only happens during tool execution")
     

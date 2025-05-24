@@ -20,13 +20,26 @@ def apply_config_instantly(config_param):
     if not config_param:
         return
     try:
-        import base64
-        decoded = base64.b64decode(config_param).decode('utf-8')
-        config_data = json.loads(decoded)
+        # Handle different config formats that Smithery might send
+        if isinstance(config_param, str):
+            if config_param.startswith('{'):
+                # Direct JSON string
+                config_data = json.loads(config_param)
+            else:
+                # Base64 encoded JSON
+                import base64
+                decoded = base64.b64decode(config_param).decode('utf-8')
+                config_data = json.loads(decoded)
+        else:
+            config_data = config_param
+            
+        # Apply configuration to environment variables
         for key, env_var in [('confluenceUrl', 'CONFLUENCE_URL'), ('username', 'CONFLUENCE_USERNAME'), ('apiToken', 'CONFLUENCE_API_TOKEN')]:
             if key in config_data:
                 os.environ[env_var] = config_data[key]
-    except:
+                print(f"STARLETTE_DEBUG: Set {env_var} from config", flush=True)
+    except Exception as e:
+        print(f"STARLETTE_DEBUG: Config parsing failed: {e}", flush=True)
         pass
 
 async def ping_endpoint(request):
@@ -177,9 +190,15 @@ def create_starlette_app():
     print(f"STARLETTE_DEBUG: App created at {time.time()}", flush=True)
     return app
 
-def run_starlette_server(host: str = "0.0.0.0", port: int = 8000):
+def run_starlette_server(host: str = "0.0.0.0", port: int = None):
     """Run Starlette server with absolute minimum overhead."""
     print(f"STARLETTE_DEBUG: Starting at {time.time()}", flush=True)
+    
+    # CRITICAL FIX: Use PORT environment variable as required by Smithery
+    if port is None:
+        port = int(os.getenv('PORT', 8000))
+    
+    print(f"STARLETTE_DEBUG: Using port {port} (from PORT env var or default)", flush=True)
     
     # Import uvicorn only when running
     import uvicorn

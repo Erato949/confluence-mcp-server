@@ -24,8 +24,15 @@ def apply_config_env(config_param):
     if not config_param:
         return
     try:
-        decoded = base64.b64decode(config_param).decode('utf-8')
-        config_data = json.loads(decoded)
+        # Handle different config formats that Smithery might send
+        if config_param.startswith('{'):
+            # Direct JSON string
+            config_data = json.loads(config_param)
+        else:
+            # Base64 encoded JSON
+            decoded = base64.b64decode(config_param).decode('utf-8')
+            config_data = json.loads(decoded)
+            
         env_map = {
             'confluenceUrl': 'CONFLUENCE_URL',
             'username': 'CONFLUENCE_USERNAME',
@@ -34,7 +41,9 @@ def apply_config_env(config_param):
         for key, env_var in env_map.items():
             if key in config_data:
                 os.environ[env_var] = config_data[key]
-    except:
+                print(f"ZERO_IMPORTS_DEBUG: Set {env_var} from config", flush=True)
+    except Exception as e:
+        print(f"ZERO_IMPORTS_DEBUG: Config parsing failed: {e}", flush=True)
         pass
 
 class UltraMinimalHandler(BaseHTTPRequestHandler):
@@ -175,9 +184,15 @@ class UltraMinimalHandler(BaseHTTPRequestHandler):
         content = json.dumps(data).encode('utf-8')
         self._send_response(status_code, content, "application/json")
 
-def run_zero_imports_server(host="0.0.0.0", port=8000):
+def run_zero_imports_server(host="0.0.0.0", port=None):
     """Run server with absolute zero external dependencies."""
     print(f"ZERO_IMPORTS_DEBUG: Starting at {time.time()}", flush=True)
+    
+    # CRITICAL FIX: Use PORT environment variable as required by Smithery
+    if port is None:
+        port = int(os.getenv('PORT', 8000))
+    
+    print(f"ZERO_IMPORTS_DEBUG: Using port {port} (from PORT env var or default)", flush=True)
     
     server = HTTPServer((host, port), UltraMinimalHandler)
     

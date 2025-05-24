@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+# Install dependencies for maximum efficiency
+RUN pip install --no-cache-dir starlette uvicorn python-multipart
+
+WORKDIR /app
+
+# Copy server code
+COPY confluence_mcp_server/ ./confluence_mcp_server/
+
+# Create a simple startup script that ensures PORT is read correctly
+RUN echo '#!/bin/bash\nexec python -m confluence_mcp_server.server_starlette_minimal "$@"' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Smithery will set PORT environment variable
+EXPOSE 8000
+
+# Health check for container readiness
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:' + __import__('os').environ.get('PORT', '8000') + '/health')"
+
+# Start the optimized server
+CMD ["python", "-m", "confluence_mcp_server.server_starlette_minimal"] 
