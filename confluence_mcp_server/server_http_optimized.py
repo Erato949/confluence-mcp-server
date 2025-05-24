@@ -65,16 +65,19 @@ class OptimizedHttpTransport:
         @self.app.get("/mcp")
         async def get_tools(config: Optional[str] = Query(None)):
             """
-            LAZY LOADING: Return tools without authentication.
-            Smithery requirement: No auth needed for tool listing.
+            SMITHERY.AI LAZY LOADING: Return tools without authentication.
+            CRITICAL: This endpoint MUST respond instantly for Smithery tool scanning.
             """
             logger.info("Tool listing requested - returning static definitions (no auth)")
             
-            # Apply config to environment if provided (but don't require it)
+            # Apply config to environment if provided (but don't require it) - NON-BLOCKING
             if config:
-                self._apply_config_if_provided(config)
+                try:
+                    self._apply_config_if_provided(config)
+                except Exception:
+                    pass  # Don't let config errors block tool listing
             
-            # Return pre-computed static tools instantly
+            # Return pre-computed static tools instantly - NO DELAYS
             return {"tools": self._static_tools}
         
         @self.app.post("/mcp")
@@ -350,4 +353,4 @@ def run_server(host: str = "0.0.0.0", port: int = 8000):
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 if __name__ == "__main__":
-    run_server() 
+    run_server()
