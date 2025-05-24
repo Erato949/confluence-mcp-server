@@ -1,5 +1,5 @@
 version: 1
-startCommand: python -m confluence_mcp_server.server_starlette_minimal
+startCommand: python -m confluence_mcp_server.server_ultra_minimal
 type: http
 configSchema:
   type: object
