@@ -25,15 +25,15 @@ COPY README.md ./
 RUN useradd -m -u 1000 mcp && chown -R mcp:mcp /app
 USER mcp
 
-# Expose port
+# Expose port (Smithery will set PORT env var)
 EXPOSE 8000
 
-# Ultra-fast health check for Smithery platform
-HEALTHCHECK --interval=10s --timeout=3s --start-period=3s --retries=2 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check that works with dynamic PORT environment variable  
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:' + __import__('os').environ.get('PORT', '8000') + '/health')" || exit 1
 
-# Run optimized server with guaranteed lazy loading
-CMD ["python", "-m", "confluence_mcp_server.server_http_optimized"]
+# Use fastest server for Smithery deployment
+CMD ["python", "-m", "confluence_mcp_server.server_starlette_minimal"]
 
 # Alternative commands:
 # For stdio transport (local): CMD ["python", "-m", "confluence_mcp_server.main"]
