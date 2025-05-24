@@ -1,28 +1,28 @@
 version: 1
-startCommand:
-  type: http
-  configSchema:
-    type: object
-    required:
-      - confluenceUrl
-      - username
-      - apiToken
-    properties:
-      confluenceUrl:
-        type: string
-        title: "Confluence URL"
-        description: "Your Confluence instance URL (e.g., https://your-org.atlassian.net)"
-        examples:
-          - "https://your-org.atlassian.net"
-      username:
-        type: string
-        title: "Username"
-        description: "Your Confluence username (email address)"
-        examples:
-          - "user@company.com"
-      apiToken:
-        type: string
-        title: "API Token"
-        description: "Confluence API token from Atlassian Account Settings"
-        examples:
-          - "ATATT3xFfGF0..." 
+startCommand: python -m confluence_mcp_server.server_http_optimized
+type: http
+configSchema:
+  type: object
+  required:
+    - confluenceUrl
+    - username
+    - apiToken
+  properties:
+    confluenceUrl:
+      type: string
+      title: "Confluence URL"
+      description: "Your Confluence instance URL (e.g., https://your-org.atlassian.net)"
+      examples:
+        - "https://your-org.atlassian.net"
+    username:
+      type: string
+      title: "Username"
+      description: "Your Confluence username (email address)"
+      examples:
+        - "user@company.com"
+    apiToken:
+      type: string
+      title: "API Token"
+      description: "Confluence API token from Atlassian Account Settings"
+      examples:
+        - "ATATT3xFfGF0..." 

@@ -466,85 +466,85 @@ async def main():
 
 async def setup_environment():
     """Setup environment variables and logging for the server."""
-    # Load environment variables from .env file with explicit path
-    import sys
-    from pathlib import Path
-    
-    # Environment variable loading strategy:
-    # 1. Check if already set (e.g., from Claude Desktop config)
-    # 2. Try loading from .env file in multiple locations
-    # 3. Fallback to default load_dotenv() behavior
-    required_env_vars = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN"]
-    already_set = all(os.getenv(var) for var in required_env_vars)
-    
-    if already_set:
-        logger.info("Environment variables already set (likely from Claude Desktop config)")
-    else:
-        # Try to load from .env file if environment variables aren't already set
-        logger.info("Environment variables not set, attempting to load from .env file")
+        # Load environment variables from .env file with explicit path
+        import sys
+        from pathlib import Path
         
-        # Try multiple possible locations for .env file
-        # This handles different execution contexts (direct run vs module run)
-        env_locations = [
-            # Current directory (when run from project root)
-            Path.cwd() / ".env",
-            # Parent of main.py file (project root)  
-            Path(__file__).parent.parent / ".env",
-            # Absolute path based on current working directory
-            Path.cwd().resolve() / ".env",
-        ]
+        # Environment variable loading strategy:
+        # 1. Check if already set (e.g., from Claude Desktop config)
+        # 2. Try loading from .env file in multiple locations
+        # 3. Fallback to default load_dotenv() behavior
+        required_env_vars = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN"]
+        already_set = all(os.getenv(var) for var in required_env_vars)
         
-        env_loaded = False
-        for env_path in env_locations:
-            try:
-                # Force load without checking existence (file might be hidden by IDE)
-                result = load_dotenv(env_path)
-                if result:  # load_dotenv returns True if file was loaded
-                    logger.info(f"Successfully loaded environment from: {env_path}")
-                    env_loaded = True
-                    break
-                else:
-                    logger.debug(f"Tried to load from {env_path} but got False result")
-            except Exception as e:
-                logger.debug(f"Failed to load env from {env_path}: {e}")
-                continue
+        if already_set:
+            logger.info("Environment variables already set (likely from Claude Desktop config)")
+        else:
+            # Try to load from .env file if environment variables aren't already set
+            logger.info("Environment variables not set, attempting to load from .env file")
+            
+            # Try multiple possible locations for .env file
+            # This handles different execution contexts (direct run vs module run)
+            env_locations = [
+                # Current directory (when run from project root)
+                Path.cwd() / ".env",
+                # Parent of main.py file (project root)  
+                Path(__file__).parent.parent / ".env",
+                # Absolute path based on current working directory
+                Path.cwd().resolve() / ".env",
+            ]
+            
+            env_loaded = False
+            for env_path in env_locations:
+                try:
+                    # Force load without checking existence (file might be hidden by IDE)
+                    result = load_dotenv(env_path)
+                    if result:  # load_dotenv returns True if file was loaded
+                        logger.info(f"Successfully loaded environment from: {env_path}")
+                        env_loaded = True
+                        break
+                    else:
+                        logger.debug(f"Tried to load from {env_path} but got False result")
+                except Exception as e:
+                    logger.debug(f"Failed to load env from {env_path}: {e}")
+                    continue
+            
+            if not env_loaded:
+                # Final fallback - try load_dotenv() without path
+                # This lets python-dotenv search in its default locations
+                load_dotenv()
+                logger.info("Using fallback load_dotenv() without explicit path")
         
-        if not env_loaded:
-            # Final fallback - try load_dotenv() without path
-            # This lets python-dotenv search in its default locations
-            load_dotenv()
-            logger.info("Using fallback load_dotenv() without explicit path")
-    
-    # Setup logging configuration (file-based to avoid stdout interference)
-    # CRITICAL: All logging must go to files, not stdout/stderr
-    # Stdout interference breaks JSON-RPC protocol used by Claude Desktop
-    try:
-        setup_logging()
-    except:
-        # Fail silently - don't interfere with MCP protocol
-        pass
+        # Setup logging configuration (file-based to avoid stdout interference)
+        # CRITICAL: All logging must go to files, not stdout/stderr
+        # Stdout interference breaks JSON-RPC protocol used by Claude Desktop
+        try:
+            setup_logging()
+        except:
+            # Fail silently - don't interfere with MCP protocol
+            pass
 
-    # Validate environment variables are now available
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-    if missing_vars:
-        # Log but don't print to stderr (would interfere with MCP protocol)
-        logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}")
-        if not already_set:
-            logger.critical(f"Tried env file locations: {[str(p) for p in env_locations] if 'env_locations' in locals() else 'None'}")
+        # Validate environment variables are now available
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+        if missing_vars:
+            # Log but don't print to stderr (would interfere with MCP protocol)
+            logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}")
+            if not already_set:
+                logger.critical(f"Tried env file locations: {[str(p) for p in env_locations] if 'env_locations' in locals() else 'None'}")
         raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
-    
-    # Log successful environment loading for debugging
-    logger.info(f"Environment variables loaded successfully")
-    logger.info(f"CONFLUENCE_URL: {os.getenv('CONFLUENCE_URL')}")
-    logger.info(f"CONFLUENCE_USERNAME: {os.getenv('CONFLUENCE_USERNAME')}")
-    
-    # 🔒 SECURITY: Never log API tokens - only confirm they exist
-    api_token = os.getenv("CONFLUENCE_API_TOKEN")
-    if api_token:
-        logger.info("CONFLUENCE_API_TOKEN: ******* (loaded successfully)")
-    else:
-        logger.error("CONFLUENCE_API_TOKEN: Not found in environment variables")
-
+        
+        # Log successful environment loading for debugging
+        logger.info(f"Environment variables loaded successfully")
+        logger.info(f"CONFLUENCE_URL: {os.getenv('CONFLUENCE_URL')}")
+        logger.info(f"CONFLUENCE_USERNAME: {os.getenv('CONFLUENCE_USERNAME')}")
+        
+        # 🔒 SECURITY: Never log API tokens - only confirm they exist
+        api_token = os.getenv("CONFLUENCE_API_TOKEN")
+        if api_token:
+            logger.info("CONFLUENCE_API_TOKEN: ******* (loaded successfully)")
+        else:
+            logger.error("CONFLUENCE_API_TOKEN: Not found in environment variables")
+        
 
 # --- Main Execution Block ---
 if __name__ == "__main__":

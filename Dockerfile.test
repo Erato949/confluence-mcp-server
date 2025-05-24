@@ -1,0 +1,27 @@
+# Minimal Test Dockerfile for Smithery Diagnosis
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Install only FastAPI and uvicorn
+RUN pip install fastapi uvicorn
+
+# Copy only the minimal test server
+COPY confluence_mcp_server/minimal_test_server.py ./
+COPY smithery.yaml ./
+
+# Create user
+RUN useradd -m -u 1000 mcp && chown -R mcp:mcp /app
+USER mcp
+
+EXPOSE 8000
+
+# Simple health check
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the minimal test server
+CMD ["python", "minimal_test_server.py"] 

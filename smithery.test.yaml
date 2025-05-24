@@ -1,0 +1,10 @@
+version: 1
+startCommand: python minimal_test_server.py
+type: http
+configSchema:
+  type: object
+  properties:
+    testParam:
+      type: string
+      title: Test Parameter
+      description: A simple test parameter 

@@ -13,7 +13,7 @@ A **universal, production-ready MCP (Model Context Protocol) server** for Conflu
 | Platform | Transport | Status | Use Case |
 |----------|-----------|--------|----------|
 | **Claude Desktop** | stdio | ✅ 100% Compatible | Local development, personal use |
-| **Smithery.ai** | HTTP | ✅ Production Ready | Cloud deployment, team sharing |
+| **Smithery.ai** | HTTP | 🔧 Optimized | Cloud deployment, team sharing (optimized server) |
 | **Docker** | HTTP/stdio | ✅ Production Ready | Containerized deployment |
 | **Web Clients** | HTTP | ✅ Production Ready | Browser-based AI tools |
 | **Cloud Platforms** | HTTP | ✅ Production Ready | Railway, Heroku, AWS, etc. |
@@ -188,6 +188,16 @@ AI: I'll search for pages with "API documentation" updated recently...
 
 ## 🔧 Configuration Options
 
+### Platform Compatibility Notes
+
+**Cursor**: Requires installation path with **no spaces**. Your current path `C:/Users/chris/Documents/Confluence-MCP-Server_Claude` is compatible.
+
+**Windsurf**: Full MCP support with both stdio and HTTP transports.
+
+**Smithery.ai**: Uses HTTP transport with automatic configuration management.
+
+**Claude Desktop**: Uses stdio transport with manual configuration.
+
 ### Environment Variables (all platforms)
 ```bash
 CONFLUENCE_URL=https://your-org.atlassian.net
@@ -271,6 +281,14 @@ New capabilities in v1.1.0:
 - **No hammer icon**: Check config file syntax and restart Claude Desktop
 - **Authentication fails**: Verify API token and Confluence URL
 - **Tools fail**: Check environment variables and network connectivity
+
+### Cursor Issues
+- **"No tools found"**: Ensure installation path contains **no spaces**
+  - ❌ `node C:/my projects/mcpserver/build/index.js` (fails due to space)
+  - ✅ `node C:/projects/mcpserver/build/index.js` (works)
+- **Windows paths**: Use forward slashes or properly escaped backslashes
+- **Test manually first**: Verify server starts without errors before adding to Cursor
+- **Check task manager**: Look for briefly appearing node processes during refresh
 
 ### HTTP Server Issues
 - **Port conflicts**: Use `--port` flag to specify different port
