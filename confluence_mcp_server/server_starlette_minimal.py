@@ -89,7 +89,30 @@ async def post_mcp_handler(request):
         method = message.get("method")
         message_id = message.get("id")
         
-        if method == "tools/list":
+        if method == "initialize":
+            # MCP initialize handshake - required by Smithery
+            return JSONResponse({
+                "jsonrpc": "2.0",
+                "id": message_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "Confluence MCP Server",
+                        "version": "1.1.0"
+                    }
+                }
+            })
+        elif method == "initialized":
+            # MCP initialized notification - required by Smithery
+            return JSONResponse({
+                "jsonrpc": "2.0",
+                "id": message_id,
+                "result": {}
+            })
+        elif method == "tools/list":
             return JSONResponse({
                 "jsonrpc": "2.0",
                 "id": message_id,

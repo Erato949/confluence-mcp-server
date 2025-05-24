@@ -89,10 +89,35 @@ class UltraOptimizedHttpTransport:
                 message = json.loads(body.decode())
                 
                 method = message.get("method")
-                if method == "tools/list":
+                message_id = message.get("id")
+                
+                if method == "initialize":
+                    # MCP initialize handshake - required by Smithery
                     return {
                         "jsonrpc": "2.0",
-                        "id": message.get("id"),
+                        "id": message_id,
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {
+                                "tools": {}
+                            },
+                            "serverInfo": {
+                                "name": "Confluence MCP Server",
+                                "version": "1.1.0"
+                            }
+                        }
+                    }
+                elif method == "initialized":
+                    # MCP initialized notification - required by Smithery
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
+                        "result": {}
+                    }
+                elif method == "tools/list":
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
                         "result": {"tools": self._static_tools}
                     }
                 elif method == "tools/call":
@@ -100,7 +125,7 @@ class UltraOptimizedHttpTransport:
                 else:
                     return {
                         "jsonrpc": "2.0",
-                        "id": message.get("id"),
+                        "id": message_id,
                         "error": {"code": -32601, "message": f"Unknown method: {method}"}
                     }
                     

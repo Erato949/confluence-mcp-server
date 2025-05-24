@@ -102,7 +102,34 @@ class UltraMinimalHandler(BaseHTTPRequestHandler):
                 method = message.get("method")
                 message_id = message.get("id")
                 
-                if method == "tools/list":
+                if method == "initialize":
+                    # MCP initialize handshake - required by Smithery
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {
+                                "tools": {}
+                            },
+                            "serverInfo": {
+                                "name": "Confluence MCP Server",
+                                "version": "1.1.0"
+                            }
+                        }
+                    }
+                    self._send_json_response(200, response)
+                    
+                elif method == "initialized":
+                    # MCP initialized notification - required by Smithery
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
+                        "result": {}
+                    }
+                    self._send_json_response(200, response)
+                    
+                elif method == "tools/list":
                     response = {
                         "jsonrpc": "2.0",
                         "id": message_id,
