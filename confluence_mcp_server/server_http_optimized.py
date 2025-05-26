@@ -440,16 +440,23 @@ class UltraOptimizedHttpTransport:
             
             logger.warning(f"TOOL_EXECUTION: Original URL='{confluence_url}' -> Base URL='{base_url}'")
             
+            # CRITICAL DEBUG: Log exactly what we're passing to httpx
+            logger.warning(f"TOOL_EXECUTION: About to create httpx.AsyncClient with base_url='{base_url}' (type: {type(base_url)}, length: {len(base_url)})")
+            logger.warning(f"TOOL_EXECUTION: base_url valid URL check: starts_with_http={base_url.startswith(('http://', 'https://'))}, contains_domain={bool(base_url.split('://')[1] if '://' in base_url else '')}")
+            
             # Create authenticated HTTP client with proper base URL
-            async with httpx.AsyncClient(
-                base_url=base_url,
-                auth=(username, api_token),
-                timeout=30.0,
-                headers={
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                }
-            ) as client:
+            try:
+                logger.warning(f"TOOL_EXECUTION: Creating httpx.AsyncClient...")
+                async with httpx.AsyncClient(
+                    base_url=base_url,
+                    auth=(username, api_token),
+                    timeout=30.0,
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    }
+                ) as client:
+                    logger.warning(f"TOOL_EXECUTION: httpx client created successfully with base_url='{client.base_url}'")
                 
                 # Extract tool call parameters
                 params = message.get("params", {})
@@ -536,6 +543,13 @@ class UltraOptimizedHttpTransport:
                         "id": message.get("id"),
                         "result": {"content": [{"type": "text", "text": "Tool executed successfully but returned no data"}]}
                     }
+            except Exception as httpx_error:
+                logger.warning(f"TOOL_EXECUTION: HTTPX CLIENT CREATION FAILED: {type(httpx_error).__name__}: {str(httpx_error)}")
+                return {
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "error": {"code": -32603, "message": f"HTTP client creation failed: {str(httpx_error)}"}
+                }
                 
         except ToolError as e:
             return {
