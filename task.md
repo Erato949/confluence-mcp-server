@@ -3,13 +3,26 @@
 
 > **Status**: ✅ SMITHERY.AI DEPLOYMENT ISSUE RESOLVED - Ready for Production
 > **Release**: v1.0.0 Production Ready + Smithery.ai Support
-> **Last Updated**: Smithery.ai Configuration Support Completed and Tested
+> **Last Updated**: JSON Serialization Fix Completed and Tested
 
 ---
 
 ## ✅ SMITHERY.AI DEPLOYMENT ISSUE RESOLVED
 
 **COMPLETED**: The critical deployment blocker for Smithery.ai has been successfully resolved:
+
+### 🎉 **JSON Serialization Fix (PRODUCTION READY)**
+- **ISSUE**: "Object of type HttpUrl is not JSON serializable" error when calling tools via Smithery.ai
+- **ROOT CAUSE**: Pydantic HttpUrl objects in schemas were not being properly serialized to JSON strings
+- **SOLUTION**: Changed `model_dump()` to `model_dump(mode='json')` in all three server implementations
+- **FILES FIXED**: 
+  - `server_http_optimized.py` (line 537)
+  - `server_http.py` (line 445) 
+  - `server_starlette_minimal.py` (line 315)
+- **IMPACT**: Tools now work correctly via Smithery.ai without JSON serialization errors
+- **COMPATIBILITY**: Maintains full backward compatibility with Claude Desktop implementation
+- **STATUS**: ✅ VERIFIED - All tests pass, server responds correctly with proper error messages instead of serialization failures
+- **TESTING**: Comprehensive validation confirms HttpUrl objects are properly converted to strings during JSON serialization
 
 ### 🎉 **Smithery.ai Configuration Support (PRODUCTION READY)**
 - **SOLUTION IMPLEMENTED**: Dual configuration system supporting both environment variables and Smithery.ai parameters

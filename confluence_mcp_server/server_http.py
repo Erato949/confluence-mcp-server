@@ -441,7 +441,8 @@ class HttpTransport:
                 
                 # Convert result to dict if it's a Pydantic model
                 if hasattr(result, 'model_dump'):
-                    result_dict = result.model_dump()
+                    # Use mode='json' to ensure HttpUrl objects are serialized as strings
+                    result_dict = result.model_dump(mode='json')
                 else:
                     result_dict = result
                 
