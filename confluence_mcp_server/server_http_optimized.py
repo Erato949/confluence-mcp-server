@@ -373,7 +373,10 @@ class UltraOptimizedHttpTransport:
         try:
             # Import dependencies only when needed (lazy loading)
             import httpx
-            from fastmcp.exceptions import ToolError
+            
+            # Define ToolError locally if not available in fastmcp
+            class ToolError(Exception):
+                pass
             
             # Get credentials from environment
             confluence_url = os.getenv('CONFLUENCE_URL')

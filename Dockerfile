@@ -33,7 +33,7 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:' + __import__('os').environ.get('PORT', '8000') + '/health')" || exit 1
 
 # Use fastest server for Smithery deployment
-CMD ["python", "-m", "confluence_mcp_server.server_starlette_minimal"]
+CMD ["python", "-m", "confluence_mcp_server.server_http_optimized"]
 
 # Alternative commands:
 # For stdio transport (local): CMD ["python", "-m", "confluence_mcp_server.main"]
