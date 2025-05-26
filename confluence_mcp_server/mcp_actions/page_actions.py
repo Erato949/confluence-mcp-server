@@ -54,7 +54,7 @@ async def get_page_logic(client: httpx.AsyncClient, inputs: GetPageInput) -> Pag
     try:
         if inputs.page_id:
             logger.info(f"Fetching page by ID: {inputs.page_id} with params: {params}")
-            response = await client.get(f"/rest/api/content/{inputs.page_id}", params=params)
+            response = await client.get(f"/wiki/rest/api/content/{inputs.page_id}", params=params)
             response.raise_for_status() # Raises HTTPStatusError for 4xx/5xx responses
             page_data = response.json()
         elif inputs.space_key and inputs.title:
@@ -67,7 +67,7 @@ async def get_page_logic(client: httpx.AsyncClient, inputs: GetPageInput) -> Pag
             if inputs.expand:
                 search_params['expand'] = inputs.expand
             
-            response = await client.get("/rest/api/content", params=search_params)
+            response = await client.get("/wiki/rest/api/content", params=search_params)
             response.raise_for_status()
             results = response.json()
             if results and results.get('results'):
@@ -157,7 +157,7 @@ async def search_pages_logic(client: httpx.AsyncClient, inputs: SearchPagesInput
     logger.info(f"Executing Confluence search with params: {api_params}")
 
     try:
-        response = await client.get("/rest/api/content/search", params=api_params)
+        response = await client.get("/wiki/rest/api/content/search", params=api_params)
         response.raise_for_status() # Raises HTTPStatusError for 4xx/5xx responses
         response_json = response.json()
 
@@ -241,7 +241,7 @@ async def create_page_logic(client: httpx.AsyncClient, inputs: CreatePageInput) 
         payload["ancestors"] = [{"id": inputs.parent_page_id}]
 
     try:
-        response = await client.post("/rest/api/content", json=payload)
+        response = await client.post("/wiki/rest/api/content", json=payload)
         response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
         created_page_data = response.json()
 
@@ -301,7 +301,7 @@ async def update_page_logic(client: httpx.AsyncClient, inputs: UpdatePageInput) 
     try:
         # Step 1: Fetch current page data to get current version and other details
         get_params = {"expand": "body.storage,version,space"}
-        current_page_response = await client.get(f"/rest/api/content/{inputs.page_id}", params=get_params)
+        current_page_response = await client.get(f"/wiki/rest/api/content/{inputs.page_id}", params=get_params)
         if current_page_response.status_code == 404:
             raise HTTPException(status_code=404, detail=f"Page with ID '{inputs.page_id}' not found.")
         current_page_response.raise_for_status() # For other non-404 errors
@@ -334,7 +334,7 @@ async def update_page_logic(client: httpx.AsyncClient, inputs: UpdatePageInput) 
         
         # Step 4: Make the PUT request to update the page
         logger.debug(f"Updating page {inputs.page_id} with payload: {payload}")
-        update_response = await client.put(f"/rest/api/content/{inputs.page_id}", json=payload)
+        update_response = await client.put(f"/wiki/rest/api/content/{inputs.page_id}", json=payload)
         update_response.raise_for_status()
         updated_page_data = update_response.json()
 

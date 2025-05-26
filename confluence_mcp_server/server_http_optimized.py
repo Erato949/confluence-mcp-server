@@ -76,7 +76,7 @@ class UltraOptimizedHttpTransport:
             CRITICAL: This endpoint MUST respond in <500ms for Smithery compatibility.
             """
             # Apply config if provided (non-blocking, fire-and-forget)
-            if config and not self._config_applied:
+            if config:
                 try:
                     self._apply_config_async(config)
                     self._config_applied = True
@@ -92,7 +92,7 @@ class UltraOptimizedHttpTransport:
             try:
                 # Check for configuration in query parameters (Smithery.ai pattern)
                 config = request.query_params.get("config")
-                if config and not self._config_applied:
+                if config:
                     try:
                         self._apply_config_async(config)
                         self._config_applied = True
