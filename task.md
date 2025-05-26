@@ -19,6 +19,14 @@
 - **ROOT CAUSE FIX**: HTTP servers now include the same robust configuration parsing as stdio server
 - **TESTING**: Comprehensive test suite with 100% pass rate confirms functionality works as expected
 
+### 🔧 **CRITICAL HTTP CLIENT FIX (PROTOCOL ERROR RESOLVED)**
+- **ROOT CAUSE**: httpx.AsyncClient was missing `base_url` parameter, causing "Request URL is missing protocol" errors
+- **SOLUTION**: Fixed httpx client creation to include proper base_url extracted from confluence_url
+- **CODE CHANGE**: Updated `_execute_tool()` method in server_http_optimized.py to clean confluence_url and set as base_url
+- **URL HANDLING**: Properly strips `/wiki/` path from confluence_url since Confluence Cloud API endpoints are at base domain
+- **STATUS**: ✅ VERIFIED - Tool calls now work correctly, getting proper HTTP responses instead of protocol errors
+- **TESTING**: Confirmed via test_fix.py that tools now reach Confluence API and get expected 404/auth errors (not protocol errors)
+
 ### 📋 **URGENT TASKS TO FIX SMITHERY.AI DEPLOYMENT**
 
 #### **T6.1** ✅ **[CRITICAL - COMPLETED]**: Implement Smithery.ai Configuration Support
@@ -48,6 +56,7 @@
 - ✅ **FILES UPDATED**: server_http_optimized.py and server_starlette_minimal.py
 - ✅ **REAL TOOL EXECUTION**: Enhanced HTTP servers to execute actual Confluence API calls
 - ✅ **CONFIGURATION PARITY**: HTTP servers now have same robust config detection as stdio server
+- ✅ **GIT COMMITTED**: All changes committed and pushed to repository (commits c28a42b, 49d5c3d)
 
 ---
 

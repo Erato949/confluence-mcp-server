@@ -36,6 +36,9 @@ class UltraOptimizedHttpTransport:
         
         # Pre-computed static tool definitions - computed at class level for maximum speed
         self._static_tools = self._get_static_tool_definitions()
+        
+        # Store configuration state for persistence across requests
+        self._config_applied = False
     
     def _setup_minimal_middleware(self):
         """Setup minimal CORS middleware for maximum speed."""
@@ -73,9 +76,10 @@ class UltraOptimizedHttpTransport:
             CRITICAL: This endpoint MUST respond in <500ms for Smithery compatibility.
             """
             # Apply config if provided (non-blocking, fire-and-forget)
-            if config:
+            if config and not self._config_applied:
                 try:
                     self._apply_config_async(config)
+                    self._config_applied = True
                 except:
                     pass  # Never let config errors block tool listing
             
@@ -86,6 +90,15 @@ class UltraOptimizedHttpTransport:
         async def post_mcp(request: Request):
             """Handle JSON-RPC tool execution (authentication happens here)."""
             try:
+                # Check for configuration in query parameters (Smithery.ai pattern)
+                config = request.query_params.get("config")
+                if config and not self._config_applied:
+                    try:
+                        self._apply_config_async(config)
+                        self._config_applied = True
+                    except:
+                        pass  # Never let config errors block requests
+                
                 body = await request.body()
                 message = json.loads(body.decode())
                 
@@ -265,8 +278,10 @@ class UltraOptimizedHttpTransport:
     def _apply_config_async(self, config: str):
         """Apply configuration from Smithery.ai with comprehensive parsing support."""
         try:
+            logger.warning(f"SMITHERY_CONFIG: Received config (length: {len(config)}): {config[:100]}...")
             config_data = self._parse_config_parameter(config)
             if config_data:
+                logger.warning(f"SMITHERY_CONFIG: Parsed config with keys: {list(config_data.keys())}")
                 applied_config = self._apply_smithery_config_to_env(config_data)
                 if applied_config:
                     logger.warning(f"SMITHERY_CONFIG: Applied configuration for: {list(applied_config.keys())}")
@@ -324,14 +339,14 @@ class UltraOptimizedHttpTransport:
         
         for config_key, env_var in env_mapping.items():
             if config_key in config_data and config_data[config_key]:
-                # Only override if environment variable isn't already set
-                # This preserves Claude Desktop config when available
-                if not os.getenv(env_var):
-                    os.environ[env_var] = str(config_data[config_key])
-                    applied_config[env_var] = str(config_data[config_key])
-                    logger.warning(f"SMITHERY_CONFIG: Set {env_var} from Smithery config")
+                # Always apply Smithery config when deployed on Smithery
+                old_value = os.getenv(env_var)
+                os.environ[env_var] = str(config_data[config_key])
+                applied_config[env_var] = str(config_data[config_key])
+                if old_value:
+                    logger.warning(f"SMITHERY_CONFIG: Updated {env_var} (was previously set)")
                 else:
-                    logger.warning(f"SMITHERY_CONFIG: {env_var} already set, preserving existing value")
+                    logger.warning(f"SMITHERY_CONFIG: Set {env_var} from Smithery config")
         
         return applied_config
     
@@ -347,18 +362,36 @@ class UltraOptimizedHttpTransport:
             username = os.getenv('CONFLUENCE_USERNAME') 
             api_token = os.getenv('CONFLUENCE_API_TOKEN')
             
+            # Debug logging for tool execution
+            logger.warning(f"TOOL_EXECUTION: URL='{confluence_url}', USERNAME='{username}', TOKEN={'SET' if api_token else 'NOT_SET'}")
+            logger.warning(f"TOOL_EXECUTION: URL type: {type(confluence_url)}, URL length: {len(confluence_url) if confluence_url else 0}")
+            
             if not all([confluence_url, username, api_token]):
+                missing = []
+                if not confluence_url: missing.append("CONFLUENCE_URL")
+                if not username: missing.append("CONFLUENCE_USERNAME") 
+                if not api_token: missing.append("CONFLUENCE_API_TOKEN")
+                
                 return {
                     "jsonrpc": "2.0",
                     "id": message.get("id"),
                     "error": {
                         "code": -32602,
-                        "message": f"Missing config: CONFLUENCE_URL, CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN"
+                        "message": f"Missing required configuration: {', '.join(missing)}"
                     }
                 }
             
-            # Create authenticated HTTP client
+            # Clean up the confluence URL to get the base domain for API calls
+            # Remove /wiki/ path as Confluence Cloud API endpoints are at the base domain
+            base_url = confluence_url.rstrip('/wiki/').rstrip('/')
+            if not base_url.startswith(('http://', 'https://')):
+                base_url = f'https://{base_url}'
+            
+            logger.warning(f"TOOL_EXECUTION: Using base_url='{base_url}' for httpx client")
+            
+            # Create authenticated HTTP client with proper base URL
             async with httpx.AsyncClient(
+                base_url=base_url,
                 auth=(username, api_token),
                 timeout=30.0,
                 headers={
