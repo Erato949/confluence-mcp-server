@@ -1,6 +1,14 @@
 version: 1
-name: "Confluence MCP Server"
-startCommand:
+name: confluence-mcp-server
+runtime: python
+build_command: pip install -e .
+start_command: python -m confluence_mcp_server.server_http_optimized
+environment_variables:
+  # SECURITY: These are DEBUG PLACEHOLDERS ONLY - Real values come from Smithery UI
+  # If you see these values in logs, it means Smithery UI config is NOT being applied
+  CONFLUENCE_URL: "DEBUG_TEMPLATE_CONFIG_BEING_USED"
+  CONFLUENCE_USERNAME: "DEBUG_TEMPLATE_CONFIG_BEING_USED"
+  CONFLUENCE_API_TOKEN: "DEBUG_TEMPLATE_CONFIG_BEING_USED"
   type: http
   configSchema:
     type: object
