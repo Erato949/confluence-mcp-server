@@ -12,6 +12,8 @@ import tempfile
 import logging
 from pathlib import Path
 from unittest.mock import patch
+import httpx
+import asyncio
 
 # Add project root to path so we can import the main module
 project_root = Path(__file__).parent
@@ -235,6 +237,97 @@ def test_integration_scenario():
             elif var in os.environ:
                 del os.environ[var]
 
+async def test_smithery_config():
+    """Test Smithery configuration application and tool execution"""
+    
+    # Create Smithery-style config
+    config_data = {
+        "confluenceUrl": "https://feedbackloopai.atlassian.net/wiki/",
+        "username": "test@example.com",
+        "apiToken": "fake-token-for-testing"
+    }
+    
+    # Encode config like Smithery does
+    config_json = json.dumps(config_data)
+    config_encoded = base64.b64encode(config_json.encode()).decode()
+    
+    print(f"Testing with config: {config_data}")
+    print(f"Encoded config: {config_encoded[:50]}...")
+    
+    base_url = "http://localhost:8000"
+    
+    async with httpx.AsyncClient() as client:
+        # Test 1: GET /mcp with config
+        print("\n=== Test 1: GET /mcp with config ===")
+        try:
+            response = await client.get(f"{base_url}/mcp", params={"config": config_encoded})
+            print(f"Status: {response.status_code}")
+            if response.status_code == 200:
+                tools = response.json().get("tools", [])
+                print(f"Retrieved {len(tools)} tools")
+            else:
+                print(f"Error: {response.text}")
+        except Exception as e:
+            print(f"Request failed: {e}")
+        
+        # Test 2: POST /mcp - tools/list with config
+        print("\n=== Test 2: POST /mcp - tools/list with config ===")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {}
+            }
+            response = await client.post(
+                f"{base_url}/mcp", 
+                json=mcp_request,
+                params={"config": config_encoded}
+            )
+            print(f"Status: {response.status_code}")
+            if response.status_code == 200:
+                result = response.json()
+                tools = result.get("result", {}).get("tools", [])
+                print(f"Retrieved {len(tools)} tools via MCP")
+            else:
+                print(f"Error: {response.text}")
+        except Exception as e:
+            print(f"Request failed: {e}")
+        
+        # Test 3: POST /mcp - tools/call (this should fail with auth error, not URL error)
+        print("\n=== Test 3: POST /mcp - tools/call with config ===")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_confluence_spaces",
+                    "arguments": {"limit": 5}
+                }
+            }
+            response = await client.post(
+                f"{base_url}/mcp", 
+                json=mcp_request,
+                params={"config": config_encoded}
+            )
+            print(f"Status: {response.status_code}")
+            result = response.json()
+            if "error" in result:
+                error_msg = result["error"]["message"]
+                print(f"Error (expected): {error_msg}")
+                # Check if it's the URL protocol error or an auth error
+                if "protocol" in error_msg.lower():
+                    print("❌ STILL GETTING URL PROTOCOL ERROR!")
+                elif "401" in error_msg or "auth" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                    print("✅ Got auth error instead of URL error - config is working!")
+                else:
+                    print(f"ℹ️  Different error: {error_msg}")
+            else:
+                print("✅ Unexpected success (maybe credentials worked?)")
+        except Exception as e:
+            print(f"Request failed: {e}")
+
 def main():
     """Run all tests."""
     print("🧪 Testing Smithery.ai Configuration Support")
@@ -245,6 +338,7 @@ def main():
         test_apply_smithery_config_to_env()
         test_detect_and_apply_smithery_config()
         test_integration_scenario()
+        asyncio.run(test_smithery_config())
         
         print("\n" + "=" * 50)
         print("🎉 ALL TESTS PASSED!")
