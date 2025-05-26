@@ -384,6 +384,9 @@ class UltraOptimizedHttpTransport:
             logger.warning(f"TOOL_EXECUTION: URL='{confluence_url}', USERNAME='{username}', TOKEN={'SET' if api_token else 'NOT_SET'}")
             logger.warning(f"TOOL_EXECUTION: URL type: {type(confluence_url)}, URL length: {len(confluence_url) if confluence_url else 0}")
             
+            # Additional debug info
+            logger.warning(f"TOOL_EXECUTION: All env vars - URL={os.getenv('CONFLUENCE_URL')}, USER={os.getenv('CONFLUENCE_USERNAME')}, TOKEN_SET={bool(os.getenv('CONFLUENCE_API_TOKEN'))}")
+            
             if not all([confluence_url, username, api_token]):
                 missing = []
                 if not confluence_url: missing.append("CONFLUENCE_URL")
@@ -401,11 +404,41 @@ class UltraOptimizedHttpTransport:
             
             # Clean up the confluence URL to get the base domain for API calls
             # Remove /wiki/ path as Confluence Cloud API endpoints are at the base domain
-            base_url = confluence_url.rstrip('/wiki/').rstrip('/')
-            if not base_url.startswith(('http://', 'https://')):
-                base_url = f'https://{base_url}'
             
-            logger.warning(f"TOOL_EXECUTION: Using base_url='{base_url}' for httpx client")
+            # First, handle cases where URL might be None or empty
+            if not confluence_url or not confluence_url.strip():
+                return {
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "error": {
+                        "code": -32602,
+                        "message": "CONFLUENCE_URL is empty or not set"
+                    }
+                }
+            
+            # Parse the URL to extract just the domain
+            if confluence_url.startswith(('http://', 'https://')):
+                # Extract domain from full URL
+                from urllib.parse import urlparse
+                parsed = urlparse(confluence_url)
+                domain = parsed.netloc
+                if not domain:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "error": {
+                            "code": -32602,
+                            "message": f"Invalid CONFLUENCE_URL format: {confluence_url}"
+                        }
+                    }
+                # Force HTTPS for Confluence Cloud
+                base_url = f'https://{domain}'
+            else:
+                # Assume it's just a domain name
+                domain = confluence_url.strip().rstrip('/').split('/')[0]
+                base_url = f'https://{domain}'
+            
+            logger.warning(f"TOOL_EXECUTION: Original URL='{confluence_url}' -> Base URL='{base_url}'")
             
             # Create authenticated HTTP client with proper base URL
             async with httpx.AsyncClient(
