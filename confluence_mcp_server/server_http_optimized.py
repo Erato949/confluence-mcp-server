@@ -282,9 +282,27 @@ class UltraOptimizedHttpTransport:
             config_data = self._parse_config_parameter(config)
             if config_data:
                 logger.warning(f"SMITHERY_CONFIG: Parsed config with keys: {list(config_data.keys())}")
+                
+                # ENHANCED DEBUG: Log the actual decoded values (mask sensitive data)
+                for key, value in config_data.items():
+                    if 'token' in key.lower() or 'password' in key.lower():
+                        masked_value = f"[MASKED_{len(str(value))}]" if value else "[EMPTY]"
+                        logger.warning(f"SMITHERY_CONFIG: DECODED {key} = {masked_value}")
+                    else:
+                        logger.warning(f"SMITHERY_CONFIG: DECODED {key} = '{value}'")
+                
                 applied_config = self._apply_smithery_config_to_env(config_data)
                 if applied_config:
                     logger.warning(f"SMITHERY_CONFIG: Applied configuration for: {list(applied_config.keys())}")
+                    
+                    # ENHANCED DEBUG: Verify what actually got set in environment
+                    for env_var in applied_config.keys():
+                        env_value = os.getenv(env_var)
+                        if 'TOKEN' in env_var:
+                            masked_env = f"[MASKED_{len(env_value)}]" if env_value else "[EMPTY]"
+                            logger.warning(f"SMITHERY_CONFIG: ENV_VERIFY {env_var} = {masked_env}")
+                        else:
+                            logger.warning(f"SMITHERY_CONFIG: ENV_VERIFY {env_var} = '{env_value}'")
                 else:
                     logger.warning("SMITHERY_CONFIG: No config applied (vars already set)")
             else:
