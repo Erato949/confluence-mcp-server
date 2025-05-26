@@ -419,9 +419,9 @@ class UltraOptimizedHttpTransport:
                     }
                 }
             
-            # Parse the URL to extract just the domain
+            # Parse the URL to extract the base URL properly for Confluence Cloud
             if confluence_url.startswith(('http://', 'https://')):
-                # Extract domain from full URL
+                # Extract the full URL up to /wiki path for Confluence Cloud
                 from urllib.parse import urlparse
                 parsed = urlparse(confluence_url)
                 domain = parsed.netloc
@@ -434,12 +434,12 @@ class UltraOptimizedHttpTransport:
                             "message": f"Invalid CONFLUENCE_URL format: {confluence_url}"
                         }
                     }
-                # Force HTTPS for Confluence Cloud
-                base_url = f'https://{domain}'
+                # Force HTTPS and include /wiki path for Confluence Cloud API
+                base_url = f'https://{domain}/wiki'
             else:
                 # Assume it's just a domain name
                 domain = confluence_url.strip().rstrip('/').split('/')[0]
-                base_url = f'https://{domain}'
+                base_url = f'https://{domain}/wiki'
             
             logger.warning(f"TOOL_EXECUTION: Original URL='{confluence_url}' -> Base URL='{base_url}'")
             
@@ -460,92 +460,92 @@ class UltraOptimizedHttpTransport:
                     }
                 ) as client:
                     logger.warning(f"TOOL_EXECUTION: httpx client created successfully with base_url='{client.base_url}'")
-                
-                # Extract tool call parameters
-                params = message.get("params", {})
-                tool_name = params.get("name")
-                tool_args = params.get("arguments", {})
-                
-                # Import action modules (lazy loading)
-                try:
-                    from confluence_mcp_server.mcp_actions import page_actions, space_actions, attachment_actions, comment_actions
-                    from confluence_mcp_server.mcp_actions.schemas import (
-                        GetPageInput, SearchPagesInput, CreatePageInput, UpdatePageInput, DeletePageInput,
-                        GetSpacesInput, GetAttachmentsInput, AddAttachmentInput, DeleteAttachmentInput, GetCommentsInput
-                    )
-                except ImportError as e:
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "error": {"code": -32603, "message": f"Import error: {str(e)}"}
-                    }
-                
-                # Execute the appropriate tool
-                result = None
-                if tool_name == "get_confluence_page":
-                    inputs = GetPageInput(**tool_args)
-                    result = await page_actions.get_page_logic(client, inputs)
-                elif tool_name == "search_confluence_pages":
-                    inputs = SearchPagesInput(**tool_args)
-                    result = await page_actions.search_pages_logic(client, inputs)
-                elif tool_name == "create_confluence_page":
-                    inputs = CreatePageInput(**tool_args)
-                    result = await page_actions.create_page_logic(client, inputs)
-                elif tool_name == "update_confluence_page":
-                    inputs = UpdatePageInput(**tool_args)
-                    result = await page_actions.update_page_logic(client, inputs)
-                elif tool_name == "delete_confluence_page":
-                    inputs = DeletePageInput(**tool_args)
-                    result = await page_actions.delete_page_logic(client, inputs)
-                elif tool_name == "get_confluence_spaces":
-                    inputs = GetSpacesInput(**tool_args)
-                    result = await space_actions.get_spaces_logic(client, inputs)
-                elif tool_name == "get_page_attachments":
-                    inputs = GetAttachmentsInput(**tool_args)
-                    result = await attachment_actions.get_attachments_logic(client, inputs)
-                elif tool_name == "add_page_attachment":
-                    inputs = AddAttachmentInput(**tool_args)
-                    result = await attachment_actions.add_attachment_logic(client, inputs)
-                elif tool_name == "delete_page_attachment":
-                    inputs = DeleteAttachmentInput(**tool_args)
-                    result = await attachment_actions.delete_attachment_logic(client, inputs)
-                elif tool_name == "get_page_comments":
-                    inputs = GetCommentsInput(**tool_args)
-                    result = await comment_actions.get_comments_logic(client, inputs)
-                else:
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}
-                    }
-                
-                # Convert result to MCP response format
-                if result:
-                    # Convert Pydantic model to dict if needed
-                    if hasattr(result, 'model_dump'):
-                        result_dict = result.model_dump()
-                    else:
-                        result_dict = result
                     
-                    # Format as MCP tool response
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": json.dumps(result_dict, indent=2)
-                                }
-                            ]
+                    # Extract tool call parameters
+                    params = message.get("params", {})
+                    tool_name = params.get("name")
+                    tool_args = params.get("arguments", {})
+                    
+                    # Import action modules (lazy loading)
+                    try:
+                        from confluence_mcp_server.mcp_actions import page_actions, space_actions, attachment_actions, comment_actions
+                        from confluence_mcp_server.mcp_actions.schemas import (
+                            GetPageInput, SearchPagesInput, CreatePageInput, UpdatePageInput, DeletePageInput,
+                            GetSpacesInput, GetAttachmentsInput, AddAttachmentInput, DeleteAttachmentInput, GetCommentsInput
+                        )
+                    except ImportError as e:
+                        return {
+                            "jsonrpc": "2.0",
+                            "id": message.get("id"),
+                            "error": {"code": -32603, "message": f"Import error: {str(e)}"}
                         }
-                    }
-                else:
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "result": {"content": [{"type": "text", "text": "Tool executed successfully but returned no data"}]}
-                    }
+                    
+                    # Execute the appropriate tool
+                    result = None
+                    if tool_name == "get_confluence_page":
+                        inputs = GetPageInput(**tool_args)
+                        result = await page_actions.get_page_logic(client, inputs)
+                    elif tool_name == "search_confluence_pages":
+                        inputs = SearchPagesInput(**tool_args)
+                        result = await page_actions.search_pages_logic(client, inputs)
+                    elif tool_name == "create_confluence_page":
+                        inputs = CreatePageInput(**tool_args)
+                        result = await page_actions.create_page_logic(client, inputs)
+                    elif tool_name == "update_confluence_page":
+                        inputs = UpdatePageInput(**tool_args)
+                        result = await page_actions.update_page_logic(client, inputs)
+                    elif tool_name == "delete_confluence_page":
+                        inputs = DeletePageInput(**tool_args)
+                        result = await page_actions.delete_page_logic(client, inputs)
+                    elif tool_name == "get_confluence_spaces":
+                        inputs = GetSpacesInput(**tool_args)
+                        result = await space_actions.get_spaces_logic(client, inputs)
+                    elif tool_name == "get_page_attachments":
+                        inputs = GetAttachmentsInput(**tool_args)
+                        result = await attachment_actions.get_attachments_logic(client, inputs)
+                    elif tool_name == "add_page_attachment":
+                        inputs = AddAttachmentInput(**tool_args)
+                        result = await attachment_actions.add_attachment_logic(client, inputs)
+                    elif tool_name == "delete_page_attachment":
+                        inputs = DeleteAttachmentInput(**tool_args)
+                        result = await attachment_actions.delete_attachment_logic(client, inputs)
+                    elif tool_name == "get_page_comments":
+                        inputs = GetCommentsInput(**tool_args)
+                        result = await comment_actions.get_comments_logic(client, inputs)
+                    else:
+                        return {
+                            "jsonrpc": "2.0",
+                            "id": message.get("id"),
+                            "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}
+                        }
+                    
+                    # Convert result to MCP response format
+                    if result:
+                        # Convert Pydantic model to dict if needed
+                        if hasattr(result, 'model_dump'):
+                            result_dict = result.model_dump()
+                        else:
+                            result_dict = result
+                        
+                        # Format as MCP tool response
+                        return {
+                            "jsonrpc": "2.0",
+                            "id": message.get("id"),
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(result_dict, indent=2)
+                                    }
+                                ]
+                            }
+                        }
+                    else:
+                        return {
+                            "jsonrpc": "2.0",
+                            "id": message.get("id"),
+                            "result": {"content": [{"type": "text", "text": "Tool executed successfully but returned no data"}]}
+                        }
             except Exception as httpx_error:
                 logger.warning(f"TOOL_EXECUTION: HTTPX CLIENT CREATION FAILED: {type(httpx_error).__name__}: {str(httpx_error)}")
                 return {

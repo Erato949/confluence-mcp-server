@@ -33,7 +33,7 @@ async def get_comments_logic(client: httpx.AsyncClient, inputs: GetCommentsInput
             params['expand'] = 'body.storage,version,ancestors'
             
         # Make API request to get page comments
-        response = await client.get(f'/wiki/rest/api/content/{inputs.page_id}/child/comment', params=params)
+        response = await client.get(f'/rest/api/content/{inputs.page_id}/child/comment', params=params)
         
         if response.status_code == 200:
             data = response.json()

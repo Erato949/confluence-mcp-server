@@ -26,8 +26,8 @@ async def get_spaces_logic(client: httpx.AsyncClient, inputs: GetSpacesInput) ->
             'start': inputs.start
         }
             
-        # Make API request to get spaces (Confluence Cloud uses /wiki/rest/api/ prefix)
-        response = await client.get('/wiki/rest/api/space', params=params)
+        # Make API request to get spaces (base_url already includes /wiki)
+        response = await client.get('/rest/api/space', params=params)
         
         if response.status_code == 200:
             data = response.json()

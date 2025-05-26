@@ -38,7 +38,7 @@ async def get_attachments_logic(client: httpx.AsyncClient, inputs: GetAttachment
 
     try:
         response = await client.get(
-            f"/wiki/rest/api/content/{page_id}/child/attachment",
+            f"/rest/api/content/{page_id}/child/attachment",
             params=api_params
         )
         response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
@@ -163,7 +163,7 @@ async def add_attachment_logic(client: httpx.AsyncClient, inputs: AddAttachmentI
             headers = {"X-Atlassian-Token": "nocheck"}
 
             response = await client.post(
-                f"/wiki/rest/api/content/{page_id}/child/attachment",
+                f"/rest/api/content/{page_id}/child/attachment",
                 files=files_payload,
                 data=form_data,
                 headers=headers
@@ -250,7 +250,7 @@ async def delete_attachment_logic(client: httpx.AsyncClient, inputs: DeleteAttac
 
     try:
         response = await client.delete(
-            f"/wiki/rest/api/content/{attachment_id}",
+            f"/rest/api/content/{attachment_id}",
             headers=headers
         )
         response.raise_for_status() # Raises HTTPStatusError for 4xx/5xx responses
