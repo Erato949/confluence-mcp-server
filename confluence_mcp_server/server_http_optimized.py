@@ -459,7 +459,7 @@ class UltraOptimizedHttpTransport:
                         "Content-Type": "application/json"
                     }
                 ) as client:
-                    logger.warning(f"TOOL_EXECUTION: httpx client created successfully with base_url='{client.base_url}'")
+                    logger.warning(f"TOOL_EXECUTION: httpx client created successfully with base_url='{str(client.base_url)}'")
                     
                     # Extract tool call parameters
                     params = message.get("params", {})
