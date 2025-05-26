@@ -1,0 +1,18 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main document shape - large and bold -->
+  <rect x="6" y="4" width="16" height="20" rx="2" fill="#0052CC"/>
+  <rect x="8" y="6" width="12" height="16" rx="1" fill="white"/>
+  
+  <!-- Simple content representation - just 3 bold lines -->
+  <rect x="10" y="9" width="8" height="1.5" rx="0.75" fill="#0052CC"/>
+  <rect x="10" y="12" width="8" height="1.5" rx="0.75" fill="#0052CC"/>
+  <rect x="10" y="15" width="5" height="1.5" rx="0.75" fill="#0052CC"/>
+  
+  <!-- Two large connection nodes - visible at small sizes -->
+  <circle cx="4" cy="14" r="3" fill="#0052CC"/>
+  <circle cx="28" cy="18" r="3" fill="#0052CC"/>
+  
+  <!-- Connection indicators on document edges -->
+  <circle cx="6" cy="14" r="1.5" fill="#0052CC"/>
+  <circle cx="22" cy="18" r="1.5" fill="#0052CC"/>
+</svg>

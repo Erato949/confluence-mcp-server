@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Confluence MCP Server v1.0.0 - Production Ready
+Confluence MCP Server v1.2.0 - Production Ready
 A Model Context Protocol server for Confluence integration
 """
 
@@ -9,6 +9,10 @@ A Model Context Protocol server for Confluence integration
 import asyncio
 import os
 import logging
+import sys
+import base64
+import json
+from typing import Optional, Dict, Any
 
 # Third-Party Imports
 from dotenv import load_dotenv
@@ -46,6 +50,124 @@ except ImportError as e:
 # --- Setup Logging (No stderr output) ---
 logger = logging.getLogger(__name__)
 
+# --- Configuration Support for Multiple Deployment Contexts ---
+def detect_and_apply_smithery_config() -> Optional[Dict[str, str]]:
+    """
+    Detects and applies Smithery.ai configuration parameters.
+    
+    Smithery.ai passes configuration in several ways:
+    1. Via command line arguments with base64-encoded config
+    2. Via environment variables with base64-encoded config
+    3. Via query parameters (for HTTP mode)
+    
+    This function checks for these patterns and extracts Confluence credentials
+    that can be used alongside or instead of environment variables.
+    
+    Returns:
+        Dict containing Confluence credentials if found, None otherwise
+    """
+    try:
+        # Method 1: Check command line arguments for config parameter
+        # Smithery might pass: python main.py --config <base64_encoded_json>
+        config_data = None
+        
+        for i, arg in enumerate(sys.argv):
+            if arg in ['--config', '-c'] and i + 1 < len(sys.argv):
+                config_param = sys.argv[i + 1]
+                config_data = _parse_config_parameter(config_param)
+                if config_data:
+                    logger.info("SMITHERY_CONFIG: Found config via command line arguments")
+                    break
+        
+        # Method 2: Check environment variables for Smithery config
+        if not config_data:
+            env_config = os.getenv('SMITHERY_CONFIG') or os.getenv('MCP_CONFIG')
+            if env_config:
+                config_data = _parse_config_parameter(env_config)
+                if config_data:
+                    logger.info("SMITHERY_CONFIG: Found config via environment variable")
+        
+        # Method 3: Check for individual Smithery environment variables
+        # (This handles cases where Smithery sets individual env vars instead of JSON)
+        if not config_data:
+            smithery_url = os.getenv('SMITHERY_CONFLUENCE_URL')
+            smithery_username = os.getenv('SMITHERY_USERNAME') 
+            smithery_token = os.getenv('SMITHERY_API_TOKEN')
+            
+            if smithery_url or smithery_username or smithery_token:
+                config_data = {
+                    'confluenceUrl': smithery_url,
+                    'username': smithery_username,
+                    'apiToken': smithery_token
+                }
+                logger.info("SMITHERY_CONFIG: Found config via individual Smithery env vars")
+        
+        if config_data:
+            # Apply Smithery config to environment variables for compatibility
+            return _apply_smithery_config_to_env(config_data)
+        
+        return None
+        
+    except Exception as e:
+        logger.warning(f"SMITHERY_CONFIG: Error detecting Smithery config: {e}")
+        return None
+
+def _parse_config_parameter(config_param: str) -> Optional[Dict[str, Any]]:
+    """Parse configuration parameter (handles both JSON and base64 formats)."""
+    try:
+        # Try direct JSON parsing first
+        if config_param.startswith('{'):
+            return json.loads(config_param)
+        
+        # Try base64 decoding
+        try:
+            decoded = base64.b64decode(config_param).decode('utf-8')
+            return json.loads(decoded)
+        except:
+            pass
+        
+        # Try URL decoding + base64 (some environments double-encode)
+        try:
+            import urllib.parse
+            url_decoded = urllib.parse.unquote(config_param)
+            if url_decoded.startswith('{'):
+                return json.loads(url_decoded)
+            else:
+                decoded = base64.b64decode(url_decoded).decode('utf-8')
+                return json.loads(decoded)
+        except:
+            pass
+            
+        return None
+        
+    except Exception as e:
+        logger.debug(f"SMITHERY_CONFIG: Failed to parse config parameter: {e}")
+        return None
+
+def _apply_smithery_config_to_env(config_data: Dict[str, Any]) -> Dict[str, str]:
+    """Apply Smithery configuration to environment variables."""
+    # Map Smithery config keys to environment variable names
+    env_mapping = {
+        'confluenceUrl': 'CONFLUENCE_URL',
+        'username': 'CONFLUENCE_USERNAME', 
+        'apiToken': 'CONFLUENCE_API_TOKEN'
+    }
+    
+    applied_config = {}
+    
+    for config_key, env_var in env_mapping.items():
+        if config_key in config_data and config_data[config_key]:
+            # Only override if environment variable isn't already set
+            # This preserves Claude Desktop config when available
+            if not os.getenv(env_var):
+                os.environ[env_var] = str(config_data[config_key])
+                applied_config[env_var] = str(config_data[config_key])
+                logger.info(f"SMITHERY_CONFIG: Set {env_var} from Smithery config")
+            else:
+                logger.info(f"SMITHERY_CONFIG: {env_var} already set, preserving existing value")
+    
+    return applied_config
+
 # --- FastMCP Server Instance ---
 # Create the FastMCP server instance here so it can be used by tool decorators
 mcp_server = FastMCP(
@@ -57,19 +179,44 @@ async def get_confluence_client() -> httpx.AsyncClient:
     """
     Creates an authenticated httpx client for Confluence API requests.
     
+    Supports dual configuration sources:
+    1. Environment variables (for Claude Desktop and local development)
+    2. Smithery.ai configuration parameters (for Smithery deployment)
+    
     Returns:
         httpx.AsyncClient: An authenticated client configured for Confluence API
         
     Raises:
         ToolError: If authentication credentials are missing or invalid
     """
-    # Retrieve required environment variables for Confluence API access
+    # First, try to detect and apply Smithery.ai configuration
+    smithery_config = detect_and_apply_smithery_config()
+    
+    # Retrieve required credentials from environment variables
+    # (These may have been set by Smithery config detection above)
     confluence_url = os.getenv("CONFLUENCE_URL")
     username = os.getenv("CONFLUENCE_USERNAME") 
     api_token = os.getenv("CONFLUENCE_API_TOKEN")
     
+    # Enhanced error message for debugging deployment issues
     if not all([confluence_url, username, api_token]):
-        raise ToolError("Missing Confluence credentials in environment variables")
+        missing_vars = []
+        if not confluence_url:
+            missing_vars.append("CONFLUENCE_URL")
+        if not username:
+            missing_vars.append("CONFLUENCE_USERNAME")
+        if not api_token:
+            missing_vars.append("CONFLUENCE_API_TOKEN")
+        
+        # Provide detailed error for troubleshooting
+        error_details = f"Missing config: {', '.join(missing_vars)}"
+        if smithery_config:
+            error_details += f". Smithery config detected but incomplete: {list(smithery_config.keys())}"
+        else:
+            error_details += ". No Smithery config detected. Ensure credentials are provided via environment variables or Smithery configuration."
+            
+        logger.error(f"CONFLUENCE_AUTH_ERROR: {error_details}")
+        raise ToolError(error_details)
     
     # Normalize URL by removing trailing slash to ensure consistent API endpoint construction
     base_url = confluence_url.rstrip('/')
@@ -469,18 +616,24 @@ def main():
 async def setup_environment():
     """Setup environment variables and logging for the server."""
     # Load environment variables from .env file with explicit path
-    import sys
     from pathlib import Path
     
-    # Environment variable loading strategy:
-    # 1. Check if already set (e.g., from Claude Desktop config)
+    # STEP 1: Try to detect and apply Smithery.ai configuration first
+    # This must happen before checking existing environment variables
+    smithery_config = detect_and_apply_smithery_config()
+    if smithery_config:
+        logger.info(f"SMITHERY_CONFIG: Applied configuration for: {list(smithery_config.keys())}")
+    
+    # STEP 2: Environment variable loading strategy:
+    # 1. Check if already set (e.g., from Claude Desktop config or Smithery config above)
     # 2. Try loading from .env file in multiple locations
     # 3. Fallback to default load_dotenv() behavior
     required_env_vars = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "CONFLUENCE_API_TOKEN"]
     already_set = all(os.getenv(var) for var in required_env_vars)
     
     if already_set:
-        logger.info("Environment variables already set (likely from Claude Desktop config)")
+        config_source = "Smithery configuration" if smithery_config else "Claude Desktop config or existing environment"
+        logger.info(f"Environment variables already set (likely from {config_source})")
     else:
         # Try to load from .env file if environment variables aren't already set
         logger.info("Environment variables not set, attempting to load from .env file")
