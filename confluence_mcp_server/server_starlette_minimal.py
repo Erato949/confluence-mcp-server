@@ -16,31 +16,80 @@ TOOLS_JSON = '{"tools":[{"name":"get_confluence_page","description":"Retrieve a 
 START_TIME = time.time()
 
 def apply_config_instantly(config_param):
-    """Instant config application - no error handling delays."""
+    """Instant config application with comprehensive Smithery.ai support."""
     if not config_param:
         return
     try:
-        # Handle different config formats that Smithery might send
-        if isinstance(config_param, str):
-            if config_param.startswith('{'):
-                # Direct JSON string
-                config_data = json.loads(config_param)
+        config_data = parse_config_parameter(config_param)
+        if config_data:
+            applied_config = apply_smithery_config_to_env(config_data)
+            if applied_config:
+                print(f"SMITHERY_CONFIG: Applied configuration for: {list(applied_config.keys())}", flush=True)
             else:
-                # Base64 encoded JSON
-                import base64
-                decoded = base64.b64decode(config_param).decode('utf-8')
-                config_data = json.loads(decoded)
+                print("SMITHERY_CONFIG: No config applied (vars already set)", flush=True)
         else:
-            config_data = config_param
-            
-        # Apply configuration to environment variables
-        for key, env_var in [('confluenceUrl', 'CONFLUENCE_URL'), ('username', 'CONFLUENCE_USERNAME'), ('apiToken', 'CONFLUENCE_API_TOKEN')]:
-            if key in config_data:
-                os.environ[env_var] = config_data[key]
-                print(f"STARLETTE_DEBUG: Set {env_var} from config", flush=True)
+            print("SMITHERY_CONFIG: Failed to parse config parameter", flush=True)
     except Exception as e:
-        print(f"STARLETTE_DEBUG: Config parsing failed: {e}", flush=True)
+        print(f"SMITHERY_CONFIG: Error applying config: {e}", flush=True)
         pass
+
+def parse_config_parameter(config_param):
+    """Parse configuration parameter (handles both JSON and base64 formats)."""
+    try:
+        # Try direct JSON parsing first
+        if config_param.startswith('{'):
+            return json.loads(config_param)
+        
+        # Try base64 decoding
+        try:
+            import base64
+            decoded = base64.b64decode(config_param).decode('utf-8')
+            return json.loads(decoded)
+        except:
+            pass
+        
+        # Try URL decoding + base64 (some environments double-encode)
+        try:
+            import urllib.parse
+            url_decoded = urllib.parse.unquote(config_param)
+            if url_decoded.startswith('{'):
+                return json.loads(url_decoded)
+            else:
+                import base64
+                decoded = base64.b64decode(url_decoded).decode('utf-8')
+                return json.loads(decoded)
+        except:
+            pass
+            
+        return None
+        
+    except Exception as e:
+        print(f"SMITHERY_CONFIG: Failed to parse config parameter: {e}", flush=True)
+        return None
+
+def apply_smithery_config_to_env(config_data):
+    """Apply Smithery configuration to environment variables."""
+    # Map Smithery config keys to environment variable names
+    env_mapping = {
+        'confluenceUrl': 'CONFLUENCE_URL',
+        'username': 'CONFLUENCE_USERNAME', 
+        'apiToken': 'CONFLUENCE_API_TOKEN'
+    }
+    
+    applied_config = {}
+    
+    for config_key, env_var in env_mapping.items():
+        if config_key in config_data and config_data[config_key]:
+            # Only override if environment variable isn't already set
+            # This preserves Claude Desktop config when available
+            if not os.getenv(env_var):
+                os.environ[env_var] = str(config_data[config_key])
+                applied_config[env_var] = str(config_data[config_key])
+                print(f"SMITHERY_CONFIG: Set {env_var} from Smithery config", flush=True)
+            else:
+                print(f"SMITHERY_CONFIG: {env_var} already set, preserving existing value", flush=True)
+    
+    return applied_config
 
 async def ping_endpoint(request):
     """Ultra-fast ping for debugging."""
@@ -140,7 +189,7 @@ async def delete_mcp_handler(request):
     return JSONResponse({"status": "cleaned"})
 
 async def execute_tool_minimal(message):
-    """Minimal tool execution with lazy imports."""
+    """Tool execution with real Confluence API calls (lazy imports)."""
     from starlette.responses import JSONResponse
     
     try:
@@ -159,22 +208,104 @@ async def execute_tool_minimal(message):
                 }
             })
         
-        # Minimal tool execution
-        params = message.get("params", {})
-        tool_name = params.get("name", "unknown")
+        # Import dependencies only when needed (lazy loading)
+        import httpx
         
-        return JSONResponse({
-            "jsonrpc": "2.0",
-            "id": message.get("id"),
-            "result": {
-                "content": [
-                    {
-                        "type": "text", 
-                        "text": f"Tool {tool_name} executed (starlette-minimal)"
-                    }
-                ]
+        # Create authenticated HTTP client
+        async with httpx.AsyncClient(
+            auth=(username, api_token),
+            timeout=30.0,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json"
             }
-        })
+        ) as client:
+            
+            # Extract tool call parameters
+            params = message.get("params", {})
+            tool_name = params.get("name")
+            tool_args = params.get("arguments", {})
+            
+            # Import action modules (lazy loading)
+            try:
+                from confluence_mcp_server.mcp_actions import page_actions, space_actions, attachment_actions, comment_actions
+                from confluence_mcp_server.mcp_actions.schemas import (
+                    GetPageInput, SearchPagesInput, CreatePageInput, UpdatePageInput, DeletePageInput,
+                    GetSpacesInput, GetAttachmentsInput, AddAttachmentInput, DeleteAttachmentInput, GetCommentsInput
+                )
+            except ImportError as e:
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "error": {"code": -32603, "message": f"Import error: {str(e)}"}
+                })
+            
+            # Execute the appropriate tool
+            result = None
+            if tool_name == "get_confluence_page":
+                inputs = GetPageInput(**tool_args)
+                result = await page_actions.get_page_logic(client, inputs)
+            elif tool_name == "search_confluence_pages":
+                inputs = SearchPagesInput(**tool_args)
+                result = await page_actions.search_pages_logic(client, inputs)
+            elif tool_name == "create_confluence_page":
+                inputs = CreatePageInput(**tool_args)
+                result = await page_actions.create_page_logic(client, inputs)
+            elif tool_name == "update_confluence_page":
+                inputs = UpdatePageInput(**tool_args)
+                result = await page_actions.update_page_logic(client, inputs)
+            elif tool_name == "delete_confluence_page":
+                inputs = DeletePageInput(**tool_args)
+                result = await page_actions.delete_page_logic(client, inputs)
+            elif tool_name == "get_confluence_spaces":
+                inputs = GetSpacesInput(**tool_args)
+                result = await space_actions.get_spaces_logic(client, inputs)
+            elif tool_name == "get_page_attachments":
+                inputs = GetAttachmentsInput(**tool_args)
+                result = await attachment_actions.get_attachments_logic(client, inputs)
+            elif tool_name == "add_page_attachment":
+                inputs = AddAttachmentInput(**tool_args)
+                result = await attachment_actions.add_attachment_logic(client, inputs)
+            elif tool_name == "delete_page_attachment":
+                inputs = DeleteAttachmentInput(**tool_args)
+                result = await attachment_actions.delete_attachment_logic(client, inputs)
+            elif tool_name == "get_page_comments":
+                inputs = GetCommentsInput(**tool_args)
+                result = await comment_actions.get_comments_logic(client, inputs)
+            else:
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}
+                })
+            
+            # Convert result to MCP response format
+            if result:
+                # Convert Pydantic model to dict if needed
+                if hasattr(result, 'model_dump'):
+                    result_dict = result.model_dump()
+                else:
+                    result_dict = result
+                
+                # Format as MCP tool response
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(result_dict, indent=2)
+                            }
+                        ]
+                    }
+                })
+            else:
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": message.get("id"),
+                    "result": {"content": [{"type": "text", "text": "Tool executed successfully but returned no data"}]}
+                })
         
     except Exception as e:
         return JSONResponse({

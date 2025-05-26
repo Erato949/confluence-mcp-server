@@ -15,7 +15,8 @@
 - **SOLUTION IMPLEMENTED**: Dual configuration system supporting both environment variables and Smithery.ai parameters
 - **IMPACT**: Users can now deploy successfully via Smithery.ai with proper configuration handling
 - **STATUS**: ✅ RESOLVED - Production deployment via Smithery.ai now works seamlessly
-- **IMPLEMENTATION**: Enhanced `get_confluence_client()` and `setup_environment()` with comprehensive config detection
+- **IMPLEMENTATION**: Enhanced HTTP servers with comprehensive Smithery config detection (server_http_optimized.py, server_starlette_minimal.py)
+- **ROOT CAUSE FIX**: HTTP servers now include the same robust configuration parsing as stdio server
 - **TESTING**: Comprehensive test suite with 100% pass rate confirms functionality works as expected
 
 ### 📋 **URGENT TASKS TO FIX SMITHERY.AI DEPLOYMENT**
@@ -39,6 +40,14 @@
 - ✅ Detailed function docstrings explaining Smithery.ai configuration support
 - ✅ Configuration precedence order documented in code comments
 - ✅ Test suite (`test_smithery_config.py`) serves as usage examples and documentation
+
+#### **T6.4** ✅ **[CRITICAL - COMPLETED]**: Fix HTTP Server Configuration Support
+- ✅ **ROOT CAUSE IDENTIFIED**: HTTP servers lacked Smithery configuration detection logic
+- ✅ **TRANSPORT MISMATCH**: Smithery.ai uses HTTP transport but only stdio server had config support
+- ✅ **SOLUTION IMPLEMENTED**: Added comprehensive Smithery config parsing to HTTP servers
+- ✅ **FILES UPDATED**: server_http_optimized.py and server_starlette_minimal.py
+- ✅ **REAL TOOL EXECUTION**: Enhanced HTTP servers to execute actual Confluence API calls
+- ✅ **CONFIGURATION PARITY**: HTTP servers now have same robust config detection as stdio server
 
 ---
 
