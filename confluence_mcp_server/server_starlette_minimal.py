@@ -36,31 +36,49 @@ def apply_config_instantly(config_param):
 def parse_config_parameter(config_param):
     """Parse configuration parameter (handles both JSON and base64 formats)."""
     try:
+        print(f"SMITHERY_CONFIG: Parsing config parameter (length: {len(config_param)})", flush=True)
+        
         # Try direct JSON parsing first
         if config_param.startswith('{'):
-            return json.loads(config_param)
+            print("SMITHERY_CONFIG: Attempting direct JSON parsing", flush=True)
+            parsed = json.loads(config_param)
+            print(f"SMITHERY_CONFIG: Direct JSON success - keys: {list(parsed.keys())}", flush=True)
+            return parsed
         
         # Try base64 decoding
         try:
+            print("SMITHERY_CONFIG: Attempting base64 decoding", flush=True)
             import base64
             decoded = base64.b64decode(config_param).decode('utf-8')
-            return json.loads(decoded)
-        except:
-            pass
+            print(f"SMITHERY_CONFIG: Base64 decoded to: {decoded[:100]}..." if len(decoded) > 100 else f"SMITHERY_CONFIG: Base64 decoded to: {decoded}", flush=True)
+            parsed = json.loads(decoded)
+            print(f"SMITHERY_CONFIG: Base64 JSON success - keys: {list(parsed.keys())}", flush=True)
+            return parsed
+        except Exception as e:
+            print(f"SMITHERY_CONFIG: Base64 decode failed: {e}", flush=True)
         
         # Try URL decoding + base64 (some environments double-encode)
         try:
+            print("SMITHERY_CONFIG: Attempting URL decode + base64", flush=True)
             import urllib.parse
             url_decoded = urllib.parse.unquote(config_param)
+            print(f"SMITHERY_CONFIG: URL decoded to: {url_decoded[:100]}..." if len(url_decoded) > 100 else f"SMITHERY_CONFIG: URL decoded to: {url_decoded}", flush=True)
+            
             if url_decoded.startswith('{'):
-                return json.loads(url_decoded)
+                parsed = json.loads(url_decoded)
+                print(f"SMITHERY_CONFIG: URL JSON success - keys: {list(parsed.keys())}", flush=True)
+                return parsed
             else:
                 import base64
                 decoded = base64.b64decode(url_decoded).decode('utf-8')
-                return json.loads(decoded)
-        except:
-            pass
+                print(f"SMITHERY_CONFIG: URL+Base64 decoded to: {decoded[:100]}..." if len(decoded) > 100 else f"SMITHERY_CONFIG: URL+Base64 decoded to: {decoded}", flush=True)
+                parsed = json.loads(decoded)
+                print(f"SMITHERY_CONFIG: URL+Base64 JSON success - keys: {list(parsed.keys())}", flush=True)
+                return parsed
+        except Exception as e:
+            print(f"SMITHERY_CONFIG: URL+Base64 decode failed: {e}", flush=True)
             
+        print("SMITHERY_CONFIG: All parsing methods failed", flush=True)
         return None
         
     except Exception as e:
@@ -122,7 +140,16 @@ async def get_tools_instant(request):
     # Handle config parameter
     config = request.query_params.get('config')
     if config:
+        print(f"SMITHERY_DEBUG: Raw config parameter received: {config[:100]}..." if len(config) > 100 else f"SMITHERY_DEBUG: Raw config parameter: {config}", flush=True)
         apply_config_instantly(config)
+        
+        # Debug: Check environment variables after config application
+        print(f"SMITHERY_DEBUG: Environment after config:", flush=True)
+        print(f"  CONFLUENCE_URL: {'SET' if os.getenv('CONFLUENCE_URL') else 'NOT SET'}", flush=True)
+        print(f"  CONFLUENCE_USERNAME: {'SET' if os.getenv('CONFLUENCE_USERNAME') else 'NOT SET'}", flush=True)
+        print(f"  CONFLUENCE_API_TOKEN: {'SET' if os.getenv('CONFLUENCE_API_TOKEN') else 'NOT SET'}", flush=True)
+    else:
+        print("SMITHERY_DEBUG: No config parameter in GET request", flush=True)
     
     # Return pre-serialized JSON instantly
     return Response(content=TOOLS_JSON, media_type="application/json")
@@ -132,11 +159,19 @@ async def post_mcp_handler(request):
     from starlette.responses import JSONResponse
     
     try:
+        # Check if config is in query parameters for POST as well
+        config = request.query_params.get('config')
+        if config:
+            print(f"SMITHERY_DEBUG: Config found in POST query parameters", flush=True)
+            apply_config_instantly(config)
+        
         body = await request.body()
         message = json.loads(body.decode())
         
         method = message.get("method")
         message_id = message.get("id")
+        
+        print(f"SMITHERY_DEBUG: POST method: {method}", flush=True)
         
         if method == "initialize":
             # MCP initialize handshake - required by Smithery
@@ -193,12 +228,19 @@ async def execute_tool_minimal(message):
     from starlette.responses import JSONResponse
     
     try:
+        # Debug: Log current environment state
+        print("SMITHERY_TOOL_DEBUG: Tool execution starting", flush=True)
+        print(f"  CONFLUENCE_URL: {'SET' if os.getenv('CONFLUENCE_URL') else 'NOT SET'}", flush=True)
+        print(f"  CONFLUENCE_USERNAME: {'SET' if os.getenv('CONFLUENCE_USERNAME') else 'NOT SET'}", flush=True)
+        print(f"  CONFLUENCE_API_TOKEN: {'SET' if os.getenv('CONFLUENCE_API_TOKEN') else 'NOT SET'}", flush=True)
+        
         # Check environment
         confluence_url = os.getenv('CONFLUENCE_URL')
         username = os.getenv('CONFLUENCE_USERNAME')
         api_token = os.getenv('CONFLUENCE_API_TOKEN')
         
         if not all([confluence_url, username, api_token]):
+            print(f"SMITHERY_TOOL_DEBUG: Missing credentials - URL: {bool(confluence_url)}, Username: {bool(username)}, Token: {bool(api_token)}", flush=True)
             return JSONResponse({
                 "jsonrpc": "2.0",
                 "id": message.get("id"),
