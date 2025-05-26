@@ -136,6 +136,20 @@ class UltraOptimizedHttpTransport:
                     }
                 elif method == "tools/call":
                     return await self._execute_tool(message)
+                elif method == "resources/list":
+                    # Return empty resources list - not used by this server
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
+                        "result": {"resources": []}
+                    }
+                elif method == "prompts/list":
+                    # Return empty prompts list - not used by this server
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": message_id,
+                        "result": {"prompts": []}
+                    }
                 else:
                     return {
                         "jsonrpc": "2.0",
