@@ -263,7 +263,37 @@ def get_page_url_from_api_response(page_data: Dict[str, Any], base_confluence_ur
 # These support both old {"inputs": {...}} and new {...} calling conventions
 
 @mcp_server.tool()
-async def get_confluence_page(
+async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
+    """
+    Retrieves a specific Confluence page with its content and metadata.
+    
+    **Use Cases:**
+    - Get page content to read or analyze
+    - Retrieve page metadata (author, version, dates)
+    - Get page structure information (parent, space)
+    - Access page content for AI processing
+    
+    **Examples:**
+    - Get page by ID: `{"page_id": "123456"}`
+    - Get page by space and title: `{"space_key": "DOCS", "title": "Meeting Notes"}`
+    - Get page with expanded content: `{"page_id": "123456", "expand": "body.view,version,space"}`
+    
+    **Tips:**
+    - Use page_id when you know the exact page ID (faster)
+    - Use space_key + title for human-readable page identification
+    - Add expand parameter to get page content in the response
+    - Common expand values: 'body.view' (HTML content), 'body.storage' (raw format), 'version', 'space'
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.get_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to retrieve page: {str(e)}")
+
+@mcp_server.tool()
+async def get_confluence_page_direct(
     page_id: Optional[str] = None,
     space_key: Optional[str] = None,
     title: Optional[str] = None,
@@ -276,6 +306,7 @@ async def get_confluence_page(
     - Get page content to read or analyze
     - Retrieve page metadata (author, version, dates)
     - Get page structure information (parent, space)
+    - Get current version before updating a page
     
     **Examples:**
     - Get page by ID: `{"page_id": "123456"}`
@@ -287,6 +318,18 @@ async def get_confluence_page(
     - Use space_key + title for human-readable page identification
     - Add expand parameter to get page content in the response
     - Common expand values: 'body.view' (HTML content), 'body.storage' (raw format), 'version', 'space'
+    
+    **Related Tools:**
+    - Use `search_confluence_pages()` to find page IDs when you only know partial information
+    - Use `get_confluence_spaces()` to find available space keys
+    - Use `update_confluence_page()` with the version number from this response
+    - Use `get_page_attachments()` to get files associated with this page
+    - Use `get_page_comments()` to get discussions on this page
+    
+    **Workflow Example:**
+    1. Find page: `search_confluence_pages({"query": "API documentation", "space_key": "TECH"})`
+    2. Get full page: `get_confluence_page({"page_id": "123456", "expand": "body.view,version"})`
+    3. Update page: `update_confluence_page({"page_id": "123456", "new_version_number": 6, "content": "..."})`
     """
     try:
         # Construct schema object from direct parameters
@@ -304,7 +347,45 @@ async def get_confluence_page(
         raise ToolError(f"Failed to retrieve page: {str(e)}")
 
 @mcp_server.tool()
-async def search_confluence_pages(
+async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput:
+    """
+    Search for Confluence pages using text queries or advanced CQL (Confluence Query Language).
+    
+    **Use Cases:**
+    - Find pages containing specific keywords
+    - Search within a specific space
+    - Use advanced queries with CQL for precise results
+    - Discover content by topic or metadata
+    
+    **Examples:**
+    - Simple text search: `{"query": "meeting notes"}`
+    - Search in specific space: `{"query": "API documentation", "space_key": "TECH"}`
+    - Advanced CQL search: `{"cql": "space = DOCS AND created >= '2024-01-01'"}`
+    - Search with content preview: `{"query": "project", "expand": "body.view", "excerpt": "highlight"}`
+    
+    **CQL Examples:**
+    - Find pages by title: `title ~ "API*"`
+    - Find recent pages: `created >= '2024-01-01'`
+    - Find pages by author: `creator = currentUser()`
+    - Combine criteria: `space = DOCS AND type = page AND title ~ "meeting*"`
+    
+    **Tips:**
+    - Use 'query' for simple text searches (easier)
+    - Use 'cql' for complex searches with precise criteria
+    - Add 'expand' to get page content in results
+    - Use 'excerpt' to get highlighted search matches
+    - Increase 'limit' for more results (max 100)
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.search_pages_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in search_confluence_pages: {str(e)}")
+        raise ToolError(f"Failed to search pages: {str(e)}")
+
+@mcp_server.tool()
+async def search_confluence_pages_direct(
     query: Optional[str] = None,
     cql: Optional[str] = None,
     space_key: Optional[str] = None,
@@ -314,7 +395,7 @@ async def search_confluence_pages(
     excerpt: Optional[str] = None
 ) -> SearchPagesOutput:
     """
-    Search for Confluence pages using text queries or advanced CQL (Confluence Query Language).
+    Retrieves a list of Confluence pages using text queries or advanced CQL (Confluence Query Language).
     
     **Use Cases:**
     - Find pages containing specific keywords
@@ -356,11 +437,61 @@ async def search_confluence_pages(
             result = await page_actions.search_pages_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in search_confluence_pages: {str(e)}")
+        logger.error(f"Error in search_confluence_pages_direct: {str(e)}")
         raise ToolError(f"Failed to search pages: {str(e)}")
 
 @mcp_server.tool()
-async def create_confluence_page(
+async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
+    """
+    Creates a new page in Confluence with specified content and structure.
+    
+    **Use Cases:**
+    - Create documentation pages
+    - Add meeting notes or reports
+    - Create child pages under existing pages
+    - Generate pages from templates or structured content
+    
+    **Examples:**
+    - Basic page: `{"space_key": "DOCS", "title": "New Feature Guide", "content": "<p>Feature overview...</p>"}`
+    - Child page: `{"space_key": "DOCS", "title": "Sub-section", "content": "<p>Details...</p>", "parent_page_id": "123456"}`
+    - Rich content page with formatting, tables, and links
+    
+    **Content Format:**
+    - Use Confluence Storage Format (XML-based)
+    - Basic HTML tags: `<p>`, `<h1>`, `<h2>`, `<strong>`, `<em>`, `<ul>`, `<li>`
+    - Tables: `<table><tr><td>Cell content</td></tr></table>`
+    - Links: `<ac:link><ri:page ri:content-title="Page Title"/></ac:link>`
+    
+    **Tips:**
+    - Always specify space_key (required)
+    - Use descriptive, unique titles
+    - Add parent_page_id to create hierarchical structure
+    - Start with simple HTML, enhance later via Confluence UI
+    - Consider page templates for consistent formatting
+    
+    **Related Tools:**
+    - Use `get_confluence_spaces()` to find available space keys before creating
+    - Use `search_confluence_pages()` to check if page with similar title already exists
+    - Use `get_confluence_page()` to find parent page IDs for hierarchical structure
+    - Use `add_page_attachment()` after creation to upload supporting files
+    - Use `update_confluence_page()` later to modify the created page
+    
+    **Workflow Example:**
+    1. Get spaces: `get_confluence_spaces({"limit": 50})`
+    2. Check existing: `search_confluence_pages({"query": "New Feature", "space_key": "DOCS"})`
+    3. Create page: `create_confluence_page({"space_key": "DOCS", "title": "New Feature Guide", "content": "..."})`
+    4. Add files: `add_page_attachment({"page_id": "new_page_id", "file_path": "/path/to/diagram.png"})`
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.create_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in create_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to create page: {str(e)}")
+
+@mcp_server.tool()
+async def create_confluence_page_direct(
     space_key: str,
     title: str,
     content: str,
@@ -405,11 +536,48 @@ async def create_confluence_page(
             result = await page_actions.create_page_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in create_confluence_page: {str(e)}")
+        logger.error(f"Error in create_confluence_page_direct: {str(e)}")
         raise ToolError(f"Failed to create page: {str(e)}")
 
 @mcp_server.tool()
-async def update_confluence_page(
+async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
+    """
+    Updates an existing Confluence page's title, content, or position in the page hierarchy.
+    
+    **Use Cases:**
+    - Modify page content or structure
+    - Update page titles for better organization
+    - Move pages to different parents (restructure hierarchy)
+    - Make incremental content updates
+    
+    **Examples:**
+    - Update content: `{"page_id": "123456", "new_version_number": 2, "content": "<p>Updated content...</p>"}`
+    - Change title: `{"page_id": "123456", "new_version_number": 2, "title": "New Title"}`
+    - Move to different parent: `{"page_id": "123456", "new_version_number": 2, "parent_page_id": "789012"}`
+    - Make top-level: `{"page_id": "123456", "new_version_number": 2, "parent_page_id": ""}`
+    
+    **Version Management:**
+    - Always increment version number (get current version first)
+    - Confluence tracks all page versions
+    - Failed updates often due to incorrect version number
+    
+    **Tips:**
+    - Get current page first to know the version number
+    - Use get_confluence_page to see current state before updating
+    - You can update multiple fields in one operation
+    - Empty parent_page_id makes page top-level in space
+    - Preserve existing formatting when updating content
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.update_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in update_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to update page: {str(e)}")
+
+@mcp_server.tool()
+async def update_confluence_page_direct(
     page_id: str,
     new_version_number: int,
     title: Optional[str] = None,
@@ -456,38 +624,36 @@ async def update_confluence_page(
             result = await page_actions.update_page_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in update_confluence_page: {str(e)}")
+        logger.error(f"Error in update_confluence_page_direct: {str(e)}")
         raise ToolError(f"Failed to update page: {str(e)}")
 
 @mcp_server.tool()
-async def delete_confluence_page(page_id: str) -> DeletePageOutput:
+async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
     """
-    Deletes a Confluence page by moving it to trash (not permanent deletion).
+    Permanently moves a Confluence page to trash (soft delete).
     
     **Use Cases:**
     - Remove outdated or incorrect pages
-    - Clean up test or draft pages
-    - Remove duplicate content
-    - Archive pages that are no longer relevant
+    - Clean up draft pages that are no longer needed
+    - Archive pages that shouldn't be visible anymore
+    - Free up space organization
     
     **Examples:**
-    - Delete a page: `{"page_id": "123456"}`
+    - Delete page: `{"page_id": "123456"}`
     
     **Important Notes:**
     - Pages are moved to trash, not permanently deleted
-    - Pages can be restored from trash via Confluence UI
-    - Deleting parent pages may affect child page hierarchy
-    - Consider updating content instead of deleting when possible
+    - Deleted pages can be restored from trash by admins
+    - Child pages may also be affected (check Confluence behavior)
+    - Consider the impact on page links and references
     
     **Tips:**
-    - Use search_confluence_pages first to confirm you have the right page
-    - Consider the impact on child pages and page links
-    - Deleted pages can still be referenced but won't be accessible
-    - For permanent deletion, use Confluence admin interface
+    - Get page information first to confirm you're deleting the right page
+    - Check for child pages that might be affected
+    - Consider updating links that point to the page being deleted
+    - Notify users if the page was widely referenced
     """
     try:
-        # Construct schema object from direct parameters
-        inputs = DeletePageInput(page_id=page_id)
         async with await get_confluence_client() as client:
             result = await page_actions.delete_page_logic(client, inputs)
             return result
@@ -496,7 +662,78 @@ async def delete_confluence_page(page_id: str) -> DeletePageOutput:
         raise ToolError(f"Failed to delete page: {str(e)}")
 
 @mcp_server.tool()
-async def get_confluence_spaces(
+async def delete_confluence_page_direct(page_id: str) -> DeletePageOutput:
+    """
+    Permanently moves a Confluence page to trash (soft delete).
+    
+    **Use Cases:**
+    - Remove outdated or incorrect pages
+    - Clean up draft pages that are no longer needed
+    - Archive pages that shouldn't be visible anymore
+    - Free up space organization
+    
+    **Examples:**
+    - Delete page: `{"page_id": "123456"}`
+    
+    **Important Notes:**
+    - Pages are moved to trash, not permanently deleted
+    - Deleted pages can be restored from trash by admins
+    - Child pages may also be affected (check Confluence behavior)
+    - Consider the impact on page links and references
+    
+    **Tips:**
+    - Get page information first to confirm you're deleting the right page
+    - Check for child pages that might be affected
+    - Consider updating links that point to the page being deleted
+    - Notify users if the page was widely referenced
+    """
+    try:
+        # Construct schema object from direct parameters
+        inputs = DeletePageInput(page_id=page_id)
+        async with await get_confluence_client() as client:
+            result = await page_actions.delete_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in delete_confluence_page_direct: {str(e)}")
+        raise ToolError(f"Failed to delete page: {str(e)}")
+
+@mcp_server.tool()
+async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
+    """
+    Retrieves a list of Confluence spaces that the user has access to.
+    
+    **Use Cases:**
+    - Discover available spaces for content creation
+    - Get space keys for page operations
+    - Browse space structure and organization
+    - Verify access permissions to spaces
+    
+    **Examples:**
+    - Get all spaces: `{"limit": 50}`
+    - Get spaces with pagination: `{"limit": 25, "start": 25}`
+    
+    **Space Information:**
+    - Space key: Short identifier (e.g., "DOCS", "TECH")
+    - Space name: Full display name
+    - Space type: global, personal, etc.
+    - Access URL for space homepage
+    
+    **Tips:**
+    - Use space keys in page creation and search operations
+    - Space keys are required for creating pages
+    - Personal spaces usually have keys like "~username"
+    - Global spaces are shared across the organization
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await space_actions.get_spaces_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_confluence_spaces: {str(e)}")
+        raise ToolError(f"Failed to get spaces: {str(e)}")
+
+@mcp_server.tool()
+async def get_confluence_spaces_direct(
     limit: int = 25,
     start: int = 0
 ) -> GetSpacesOutput:
@@ -526,17 +763,52 @@ async def get_confluence_spaces(
     - Global spaces are shared across the organization
     """
     try:
-        # Construct schema object from direct parameters
-        inputs = GetSpacesInput(limit=limit, start=start)
         async with await get_confluence_client() as client:
             result = await space_actions.get_spaces_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in get_confluence_spaces: {str(e)}")
-        raise ToolError(f"Failed to retrieve spaces: {str(e)}")
+        logger.error(f"Error in get_confluence_spaces_direct: {str(e)}")
+        raise ToolError(f"Failed to get spaces: {str(e)}")
 
 @mcp_server.tool()
-async def get_page_attachments(
+async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
+    """
+    Retrieves a list of attachments from a specific Confluence page.
+    
+    **Use Cases:**
+    - List all files attached to a page
+    - Find specific attachments by name or type
+    - Get attachment metadata (size, type, upload date)
+    - Download or reference files from pages
+    
+    **Examples:**
+    - Get all attachments: `{"page_id": "123456"}`
+    - Search for specific file: `{"page_id": "123456", "filename": "diagram.png"}`
+    - Filter by file type: `{"page_id": "123456", "media_type": "image/png"}`
+    - Get with pagination: `{"page_id": "123456", "limit": 25, "start": 25}`
+    
+    **Attachment Information:**
+    - Filename and file extension
+    - File size and media type
+    - Upload date and author
+    - Download URL for file access
+    
+    **Tips:**
+    - Use filename parameter for exact filename searches
+    - Use media_type to filter by file type (image/*, application/pdf, etc.)
+    - Large pages may have many attachments - use pagination
+    - Download URLs are temporary and should be used promptly
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.get_attachments_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_page_attachments: {str(e)}")
+        raise ToolError(f"Failed to get attachments: {str(e)}")
+
+@mcp_server.tool()
+async def get_page_attachments_direct(
     page_id: str,
     limit: int = 50,
     start: int = 0,
@@ -544,31 +816,31 @@ async def get_page_attachments(
     media_type: Optional[str] = None
 ) -> GetAttachmentsOutput:
     """
-    Retrieves all attachments associated with a specific Confluence page.
+    Retrieves a list of attachments from a specific Confluence page.
     
     **Use Cases:**
-    - List files attached to a page
-    - Get attachment metadata (size, type, version)
-    - Find specific attachments by filename
-    - Download attachment information for processing
+    - List all files attached to a page
+    - Find specific attachments by name or type
+    - Get attachment metadata (size, type, upload date)
+    - Download or reference files from pages
     
     **Examples:**
     - Get all attachments: `{"page_id": "123456"}`
-    - Find specific file: `{"page_id": "123456", "filename": "document.pdf"}`
-    - Get attachments with pagination: `{"page_id": "123456", "limit": 10, "start": 10}`
+    - Search for specific file: `{"page_id": "123456", "filename": "diagram.png"}`
+    - Filter by file type: `{"page_id": "123456", "media_type": "image/png"}`
+    - Get with pagination: `{"page_id": "123456", "limit": 25, "start": 25}`
     
     **Attachment Information:**
-    - Filename and media type
-    - File size in bytes
+    - Filename and file extension
+    - File size and media type
     - Upload date and author
-    - Version number
-    - Download and web UI links
+    - Download URL for file access
     
     **Tips:**
-    - Use filename filter to find specific attachments
-    - Check file size before downloading large attachments
-    - Attachment links may need base URL prepended
-    - Multiple versions of the same file are tracked
+    - Use filename parameter for exact filename searches
+    - Use media_type to filter by file type (image/*, application/pdf, etc.)
+    - Large pages may have many attachments - use pagination
+    - Download URLs are temporary and should be used promptly
     """
     try:
         # Construct schema object from direct parameters
@@ -583,11 +855,47 @@ async def get_page_attachments(
             result = await attachment_actions.get_attachments_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in get_page_attachments: {str(e)}")
-        raise ToolError(f"Failed to retrieve attachments: {str(e)}")
+        logger.error(f"Error in get_page_attachments_direct: {str(e)}")
+        raise ToolError(f"Failed to get attachments: {str(e)}")
 
 @mcp_server.tool()
-async def add_page_attachment(
+async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput:
+    """
+    Uploads a file as an attachment to a specific Confluence page.
+    
+    **Use Cases:**
+    - Add supporting documents to pages
+    - Upload images for page content
+    - Attach spreadsheets, PDFs, or other files
+    - Share files with page viewers
+    
+    **Examples:**
+    - Upload file: `{"page_id": "123456", "file_path": "/path/to/document.pdf"}`
+    - Custom filename: `{"page_id": "123456", "file_path": "/path/to/file.txt", "filename_on_confluence": "report.txt"}`
+    - With comment: `{"page_id": "123456", "file_path": "/path/to/image.png", "comment": "Updated diagram"}`
+    
+    **File Requirements:**
+    - File must exist and be readable
+    - Check Confluence file size limits (usually 50MB-100MB)
+    - Supported file types vary by Confluence configuration
+    - Binary files (images, PDFs) and text files both supported
+    
+    **Tips:**
+    - Use descriptive filenames for better organization
+    - Add comments to explain file purpose or version
+    - Check existing attachments first to avoid duplicates
+    - Some file types may be restricted by admin policies
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.add_attachment_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in add_page_attachment: {str(e)}")
+        raise ToolError(f"Failed to add attachment: {str(e)}")
+
+@mcp_server.tool()
+async def add_page_attachment_direct(
     page_id: str,
     file_path: str,
     filename_on_confluence: Optional[str] = None,
@@ -597,27 +905,27 @@ async def add_page_attachment(
     Uploads a file as an attachment to a specific Confluence page.
     
     **Use Cases:**
-    - Add documents, images, or files to pages
-    - Upload supporting materials for documentation
-    - Attach reference files or resources
-    - Create new versions of existing attachments
+    - Add supporting documents to pages
+    - Upload images for page content
+    - Attach spreadsheets, PDFs, or other files
+    - Share files with page viewers
     
     **Examples:**
     - Upload file: `{"page_id": "123456", "file_path": "/path/to/document.pdf"}`
-    - Upload with custom name: `{"page_id": "123456", "file_path": "/path/to/file.txt", "filename_on_confluence": "Requirements.txt"}`
-    - Upload with comment: `{"page_id": "123456", "file_path": "/path/to/image.png", "comment": "Updated screenshot"}`
+    - Custom filename: `{"page_id": "123456", "file_path": "/path/to/file.txt", "filename_on_confluence": "report.txt"}`
+    - With comment: `{"page_id": "123456", "file_path": "/path/to/image.png", "comment": "Updated diagram"}`
     
     **File Requirements:**
-    - File must be accessible to the server process
-    - File path should be absolute for reliability
-    - Confluence may have file size and type restrictions
-    - Uploading same filename creates new version
+    - File must exist and be readable
+    - Check Confluence file size limits (usually 50MB-100MB)
+    - Supported file types vary by Confluence configuration
+    - Binary files (images, PDFs) and text files both supported
     
     **Tips:**
-    - Verify file exists and is readable before upload
     - Use descriptive filenames for better organization
-    - Consider file size limits (varies by Confluence instance)
-    - Add meaningful comments for version tracking
+    - Add comments to explain file purpose or version
+    - Check existing attachments first to avoid duplicates
+    - Some file types may be restricted by admin policies
     """
     try:
         # Construct schema object from direct parameters
@@ -631,38 +939,36 @@ async def add_page_attachment(
             result = await attachment_actions.add_attachment_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in add_page_attachment: {str(e)}")
+        logger.error(f"Error in add_page_attachment_direct: {str(e)}")
         raise ToolError(f"Failed to add attachment: {str(e)}")
 
 @mcp_server.tool()
-async def delete_page_attachment(attachment_id: str) -> DeleteAttachmentOutput:
+async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
     """
     Permanently deletes an attachment from a Confluence page.
     
     **Use Cases:**
     - Remove outdated or incorrect files
-    - Clean up unnecessary attachments
-    - Delete sensitive files that were uploaded by mistake
+    - Clean up duplicate attachments
     - Free up storage space
+    - Remove sensitive files
     
     **Examples:**
     - Delete attachment: `{"attachment_id": "att123456"}`
     
     **Important Notes:**
-    - Deletion is permanent and cannot be undone
-    - Get attachment ID using get_page_attachments first
-    - Deleting attachments may break links in page content
-    - Consider the impact on page references
+    - Attachment deletion is permanent (cannot be undone)
+    - Get attachment ID from get_page_attachments first
+    - Deleting attachments may break page content that references them
+    - Consider the impact on users who might be downloading the file
     
     **Tips:**
-    - Use get_page_attachments to find the attachment ID
-    - Verify you're deleting the correct attachment
-    - Check if attachment is referenced in page content
-    - Consider updating page content that references deleted files
+    - List attachments first to get the correct attachment ID
+    - Verify you're deleting the right file before proceeding
+    - Check if the attachment is referenced in page content
+    - Consider notifying users if the file was widely used
     """
     try:
-        # Construct schema object from direct parameters
-        inputs = DeleteAttachmentInput(attachment_id=attachment_id)
         async with await get_confluence_client() as client:
             result = await attachment_actions.delete_attachment_logic(client, inputs)
             return result
@@ -671,43 +977,109 @@ async def delete_page_attachment(attachment_id: str) -> DeleteAttachmentOutput:
         raise ToolError(f"Failed to delete attachment: {str(e)}")
 
 @mcp_server.tool()
-async def get_page_comments(
+async def delete_page_attachment_direct(attachment_id: str) -> DeleteAttachmentOutput:
+    """
+    Permanently deletes an attachment from a Confluence page.
+    
+    **Use Cases:**
+    - Remove outdated or incorrect files
+    - Clean up duplicate attachments
+    - Free up storage space
+    - Remove sensitive files
+    
+    **Examples:**
+    - Delete attachment: `{"attachment_id": "att123456"}`
+    
+    **Important Notes:**
+    - Attachment deletion is permanent (cannot be undone)
+    - Get attachment ID from get_page_attachments first
+    - Deleting attachments may break page content that references them
+    - Consider the impact on users who might be downloading the file
+    
+    **Tips:**
+    - List attachments first to get the correct attachment ID
+    - Verify you're deleting the right file before proceeding
+    - Check if the attachment is referenced in page content
+    - Consider notifying users if the file was widely used
+    """
+    try:
+        # Construct schema object from direct parameters
+        inputs = DeleteAttachmentInput(attachment_id=attachment_id)
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.delete_attachment_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in delete_page_attachment_direct: {str(e)}")
+        raise ToolError(f"Failed to delete attachment: {str(e)}")
+
+@mcp_server.tool()
+async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
+    """
+    Retrieves comments and discussions from a specific Confluence page.
+    
+    **Use Cases:**
+    - Read feedback and discussions on pages
+    - Get comment metadata (author, date, replies)
+    - Monitor page engagement and collaboration
+    - Export comments for reporting or analysis
+    
+    **Examples:**
+    - Get all comments: `{"page_id": "123456"}`
+    - Get with pagination: `{"page_id": "123456", "limit": 25, "start": 25}`
+    - Get expanded details: `{"page_id": "123456", "expand": "body.view,version"}`
+    
+    **Comment Information:**
+    - Comment content and formatting
+    - Author name and profile
+    - Creation and modification dates
+    - Comment hierarchy (replies to comments)
+    
+    **Tips:**
+    - Use expand parameter to get comment content
+    - Comments are paginated - use start/limit for large discussions
+    - Comment hierarchy shows reply relationships
+    - Some comments may be restricted based on permissions
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await comment_actions.get_comments_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_page_comments: {str(e)}")
+        raise ToolError(f"Failed to get comments: {str(e)}")
+
+@mcp_server.tool()
+async def get_page_comments_direct(
     page_id: str,
     limit: int = 25,
     start: int = 0,
     expand: Optional[str] = None
 ) -> GetCommentsOutput:
     """
-    Retrieves all comments associated with a specific Confluence page.
+    Retrieves comments and discussions from a specific Confluence page.
     
     **Use Cases:**
     - Read feedback and discussions on pages
-    - Get comment metadata (author, dates)
-    - Analyze page engagement and collaboration
-    - Extract comment threads and replies
+    - Get comment metadata (author, date, replies)
+    - Monitor page engagement and collaboration
+    - Export comments for reporting or analysis
     
     **Examples:**
     - Get all comments: `{"page_id": "123456"}`
-    - Get comments with pagination: `{"page_id": "123456", "limit": 10, "start": 10}`
-    - Get comments with history: `{"page_id": "123456", "expand": "history"}`
+    - Get with pagination: `{"page_id": "123456", "limit": 25, "start": 25}`
+    - Get expanded details: `{"page_id": "123456", "expand": "body.view,version"}`
     
     **Comment Information:**
-    - Comment content and author
-    - Creation and update timestamps
-    - Comment hierarchy (replies to other comments)
-    - Direct links to comments
-    
-    **Comment Structure:**
-    - Top-level comments have no parent
-    - Reply comments reference parent_comment_id
-    - Comments may be in storage or view format
-    - Author information includes display name
+    - Comment content and formatting
+    - Author name and profile
+    - Creation and modification dates
+    - Comment hierarchy (replies to comments)
     
     **Tips:**
-    - Use expand parameter to get additional comment details
-    - Check parent_comment_id to understand comment hierarchy
-    - Comments are ordered chronologically by default
-    - Use pagination for pages with many comments
+    - Use expand parameter to get comment content
+    - Comments are paginated - use start/limit for large discussions
+    - Comment hierarchy shows reply relationships
+    - Some comments may be restricted based on permissions
     """
     try:
         # Construct schema object from direct parameters
@@ -721,139 +1093,8 @@ async def get_page_comments(
             result = await comment_actions.get_comments_logic(client, inputs)
             return result
     except Exception as e:
-        logger.error(f"Error in get_page_comments: {str(e)}")
-        raise ToolError(f"Failed to retrieve comments: {str(e)}")
-
-# --- LEGACY TOOL FUNCTIONS (for backward compatibility with {"inputs": {...}} format) ---
-# These maintain the old calling convention
-
-@mcp_server.tool()
-async def get_confluence_page_legacy(inputs: GetPageInput) -> PageOutput:
-    """
-    Retrieves a specific Confluence page with its content and metadata.
-    
-    **Use Cases:**
-    - Get page content to read or analyze
-    - Retrieve page metadata (author, version, dates)
-    - Get page structure information (parent, space)
-    
-    **Examples:**
-    - Get page by ID: `{"page_id": "123456"}`
-    - Get page by space and title: `{"space_key": "DOCS", "title": "Meeting Notes"}`
-    - Get page with expanded content: `{"page_id": "123456", "expand": "body.view,version,space"}`
-    
-    **Tips:**
-    - Use page_id when you know the exact page ID (faster)
-    - Use space_key + title for human-readable page identification
-    - Add expand parameter to get page content in the response
-    - Common expand values: 'body.view' (HTML content), 'body.storage' (raw format), 'version', 'space'
-    """
-    try:
-        async with await get_confluence_client() as client:
-            result = await page_actions.get_page_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in get_confluence_page: {str(e)}")
-        raise ToolError(f"Failed to retrieve page: {str(e)}")
-
-@mcp_server.tool()
-async def search_confluence_pages_legacy(inputs: SearchPagesInput) -> SearchPagesOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await page_actions.search_pages_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in search_confluence_pages: {str(e)}")
-        raise ToolError(f"Failed to search pages: {str(e)}")
-
-@mcp_server.tool()
-async def create_confluence_page_legacy(inputs: CreatePageInput) -> CreatePageOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await page_actions.create_page_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in create_confluence_page: {str(e)}")
-        raise ToolError(f"Failed to create page: {str(e)}")
-
-@mcp_server.tool()
-async def update_confluence_page_legacy(inputs: UpdatePageInput) -> UpdatePageOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await page_actions.update_page_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in update_confluence_page: {str(e)}")
-        raise ToolError(f"Failed to update page: {str(e)}")
-
-@mcp_server.tool()
-async def delete_confluence_page_legacy(inputs: DeletePageInput) -> DeletePageOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await page_actions.delete_page_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in delete_confluence_page: {str(e)}")
-        raise ToolError(f"Failed to delete page: {str(e)}")
-
-@mcp_server.tool()
-async def get_confluence_spaces_legacy(inputs: GetSpacesInput) -> GetSpacesOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await space_actions.get_spaces_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in get_confluence_spaces: {str(e)}")
-        raise ToolError(f"Failed to retrieve spaces: {str(e)}")
-
-@mcp_server.tool()
-async def get_page_attachments_legacy(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await attachment_actions.get_attachments_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in get_page_attachments: {str(e)}")
-        raise ToolError(f"Failed to retrieve attachments: {str(e)}")
-
-@mcp_server.tool()
-async def add_page_attachment_legacy(inputs: AddAttachmentInput) -> AddAttachmentOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await attachment_actions.add_attachment_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in add_page_attachment: {str(e)}")
-        raise ToolError(f"Failed to add attachment: {str(e)}")
-
-@mcp_server.tool()
-async def delete_page_attachment_legacy(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await attachment_actions.delete_attachment_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in delete_page_attachment: {str(e)}")
-        raise ToolError(f"Failed to delete attachment: {str(e)}")
-
-@mcp_server.tool()
-async def get_page_comments_legacy(inputs: GetCommentsInput) -> GetCommentsOutput:
-    """Legacy version that accepts inputs object for backward compatibility."""
-    try:
-        async with await get_confluence_client() as client:
-            result = await comment_actions.get_comments_logic(client, inputs)
-            return result
-    except Exception as e:
-        logger.error(f"Error in get_page_comments: {str(e)}")
-        raise ToolError(f"Failed to retrieve comments: {str(e)}")
+        logger.error(f"Error in get_page_comments_direct: {str(e)}")
+        raise ToolError(f"Failed to get comments: {str(e)}")
 
 # --- Main Functions ---
 def main():

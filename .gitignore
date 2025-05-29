@@ -58,6 +58,7 @@ coverage.xml
 
 # Django stuff:
 *.log
+logs/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -173,3 +174,5 @@ claude_desktop_config_*.json
 
 # 📋 DOCUMENTATION - Exclude internal technical documentation
 Product_Technical_Architecture.md
+task.md
+TROUBLESHOOTING.md

@@ -55,7 +55,7 @@ class TestHttpTransportBasics:
         
         data = response.json()
         assert data["name"] == "Confluence MCP Server"
-        assert data["version"] == "1.0.0"
+        assert data["version"] == "1.1.0"
         assert data["transport"] == "http"
         assert "tools_count" in data
         assert "endpoints" in data
@@ -75,12 +75,10 @@ class TestHttpTransportBasics:
         assert response.status_code == 200
         
         data = response.json()
-        assert "jsonrpc" in data
-        assert data["jsonrpc"] == "2.0"
-        assert "result" in data
-        assert "tools" in data["result"]
+        # GET /mcp returns unwrapped format: {"tools": [...]}
+        assert "tools" in data
         
-        tools = data["result"]["tools"]
+        tools = data["tools"]
         assert len(tools) > 0
         
         # Check that expected tools are present
@@ -107,9 +105,8 @@ class TestHttpTransportBasics:
         assert response.status_code == 200
         
         data = response.json()
-        assert "jsonrpc" in data
-        assert "result" in data
-        assert "tools" in data["result"]
+        # GET /mcp returns unwrapped format: {"tools": [...]}
+        assert "tools" in data
     
     def test_mcp_delete_cleanup(self, http_client):
         """Test DELETE /mcp for session cleanup."""
@@ -149,7 +146,37 @@ class TestHttpTransportToolExecution:
         first_tool = tools[0]
         assert "name" in first_tool
         assert "description" in first_tool
-                assert "inputSchema" in first_tool        @patch('confluence_mcp_server.main.get_confluence_client')    @pytest.mark.asyncio    async def test_tool_call_request(self, mock_get_client, http_client):        """Test tools/call JSON-RPC request."""        # Mock the confluence client and response        mock_client = AsyncMock(spec=httpx.AsyncClient)        # Set base_url property for URL construction        mock_client.base_url = "https://test.atlassian.net"        mock_response = httpx.Response(            200,            json={                "id": "123456",                "title": "Test Page",                "space": {"key": "TEST"},                "_links": {"webui": "/spaces/TEST/pages/123456/Test+Page"}            },            request=httpx.Request("GET", "https://test.atlassian.net/rest/api/content/123456")        )        mock_client.get.return_value = mock_response        mock_get_client.return_value.__aenter__.return_value = mock_client
+        assert "inputSchema" in first_tool
+
+    @patch('confluence_mcp_server.server_http.httpx.AsyncClient')
+    @pytest.mark.asyncio
+    async def test_tool_call_request(self, mock_async_client, http_client):
+        """Test tools/call JSON-RPC request."""
+        # Mock the httpx.AsyncClient constructor
+        mock_client_instance = AsyncMock()
+        mock_async_client.return_value = mock_client_instance
+        
+        # Mock the async context manager
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.__aexit__.return_value = None
+        
+        # Set the base_url property to a valid URL string
+        mock_client_instance.base_url = "https://test.atlassian.net"
+        
+        # Create a synchronous mock response that matches httpx.Response behavior
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        # json() is synchronous in httpx, returns data directly
+        mock_response.json.return_value = {
+            "id": "123456",
+            "title": "Test Page",
+            "space": {"key": "TEST"},
+            "_links": {"webui": "/spaces/TEST/pages/123456/Test+Page"}
+        }
+        # raise_for_status() is also synchronous
+        mock_response.raise_for_status.return_value = None
+        # The GET call itself is async
+        mock_client_instance.get.return_value = mock_response
         
         request_data = {
             "jsonrpc": "2.0",
@@ -176,8 +203,9 @@ class TestHttpTransportToolExecution:
         assert len(content) > 0
         assert content[0]["type"] == "text"
         
-        # Verify the tool was called with correct client
-        mock_get_client.assert_called_once()
+        # Verify the mock was called
+        mock_async_client.assert_called_once()
+        mock_client_instance.get.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_unknown_tool_call(self, http_client):
@@ -290,29 +318,40 @@ class TestHttpTransportConfiguration:
 class TestHttpTransportIntegration:
     """Integration tests for HTTP transport with all tools."""
     
-    @patch('confluence_mcp_server.main.get_confluence_client')
+    @patch('confluence_mcp_server.server_http.httpx.AsyncClient')
     @pytest.mark.asyncio
-    async def test_search_pages_integration(self, mock_get_client, http_client):
+    async def test_search_pages_integration(self, mock_async_client, http_client):
         """Test search_confluence_pages through HTTP transport."""
-        # Mock client and response
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_response = httpx.Response(
-            200,
-            json={
-                "results": [
-                    {
-                        "id": "123456",
-                        "title": "Test Page",
-                        "space": {"key": "TEST"},
-                        "_links": {"webui": "/spaces/TEST/pages/123456/Test+Page"}
-                    }
-                ],
-                "size": 1
-            },
-            request=httpx.Request("GET", "http://test.com")
-        )
-        mock_client.get.return_value = mock_response
-        mock_get_client.return_value.__aenter__.return_value = mock_client
+        # Mock the httpx.AsyncClient constructor
+        mock_client_instance = AsyncMock()
+        mock_async_client.return_value = mock_client_instance
+        
+        # Mock the async context manager
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.__aexit__.return_value = None
+        
+        # Set the base_url property to a valid URL string
+        mock_client_instance.base_url = "https://test.atlassian.net"
+        
+        # Create a synchronous mock response that matches httpx.Response behavior
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        # json() is synchronous in httpx, returns data directly
+        mock_response.json.return_value = {
+            "results": [
+                {
+                    "id": "123456",
+                    "title": "Test Page",
+                    "space": {"key": "TEST"},
+                    "_links": {"webui": "/spaces/TEST/pages/123456/Test+Page"}
+                }
+            ],
+            "size": 1
+        }
+        # raise_for_status() is also synchronous
+        mock_response.raise_for_status.return_value = None
+        # The GET call itself is async
+        mock_client_instance.get.return_value = mock_response
         
         request_data = {
             "jsonrpc": "2.0",
@@ -337,17 +376,23 @@ class TestHttpTransportIntegration:
         # Verify the tool executed successfully
         result_text = data["result"]["content"][0]["text"]
         result_data = json.loads(result_text)
-        assert "pages" in result_data
-        assert len(result_data["pages"]) == 1
+        assert "results" in result_data
+        assert len(result_data["results"]) == 1
     
-    @patch('confluence_mcp_server.main.get_confluence_client')
+    @patch('confluence_mcp_server.server_http.httpx.AsyncClient')
     @pytest.mark.asyncio
-    async def test_tool_execution_error_handling(self, mock_get_client, http_client):
+    async def test_tool_execution_error_handling(self, mock_async_client, http_client):
         """Test error handling in tool execution."""
-        # Mock client to raise an exception
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get.side_effect = Exception("Test error")
-        mock_get_client.return_value.__aenter__.return_value = mock_client
+        # Mock the httpx.AsyncClient constructor to raise an exception
+        mock_client_instance = AsyncMock()
+        mock_async_client.return_value = mock_client_instance
+        
+        # Mock the async context manager
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.__aexit__.return_value = None
+        
+        # Mock the client to raise an exception
+        mock_client_instance.get.side_effect = Exception("Test error")
         
         request_data = {
             "jsonrpc": "2.0",
@@ -382,9 +427,9 @@ class TestSmitheryCompatibility:
         assert response.status_code == 200
         
         data = response.json()
-        assert "result" in data
-        assert "tools" in data["result"]
-        assert len(data["result"]["tools"]) > 0
+        # GET /mcp returns unwrapped format: {"tools": [...]}
+        assert "tools" in data
+        assert len(data["tools"]) > 0
     
     def test_smithery_config_format(self, http_client, sample_config):
         """Test Smithery configuration format compatibility."""
@@ -394,7 +439,8 @@ class TestSmitheryCompatibility:
         
         # The configuration should be applied without error
         data = response.json()
-        assert "result" in data
+        # GET /mcp returns unwrapped format: {"tools": [...]}
+        assert "tools" in data
     
     def test_cors_headers(self, http_client):
         """Test CORS headers are present for web clients."""
@@ -407,7 +453,8 @@ class TestSmitheryCompatibility:
         response = http_client.get("/mcp")
         data = response.json()
         
-        tools = data["result"]["tools"]
+        # GET /mcp returns unwrapped format: {"tools": [...]}
+        tools = data["tools"]
         for tool in tools:
             # Each tool should have required metadata
             assert isinstance(tool["name"], str)

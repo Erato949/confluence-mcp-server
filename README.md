@@ -134,6 +134,50 @@ All 10 Confluence tools work across **all transport modes** (stdio and HTTP):
 | `delete_page_attachment` | Remove files | "Delete the old attachment from page 123456" |
 | `get_page_comments` | Read page comments | "Show me comments on page 123456" |
 
+## 🔄 Calling Convention Compatibility
+
+**NEW in v1.1.0**: Support for both old and new FastMCP calling conventions for maximum compatibility.
+
+### Supported Calling Formats
+
+This server supports **both** calling conventions to ensure compatibility with different MCP clients:
+
+#### Legacy Format (FastMCP v0.x)
+```json
+{
+  "inputs": {
+    "page_id": "123456",
+    "expand": "body.view"
+  }
+}
+```
+
+#### Modern Format (FastMCP v1.x+)
+```json
+{
+  "page_id": "123456", 
+  "expand": "body.view"
+}
+```
+
+### Backward Compatibility
+
+- **✅ Zero Breaking Changes**: All existing integrations continue working unchanged
+- **✅ Automatic Detection**: Server handles both formats transparently  
+- **✅ Same Functionality**: Identical behavior regardless of calling convention
+- **✅ Error Handling**: Consistent validation and error messages for both formats
+
+### Implementation Details
+
+The server uses a **wrapper function architecture** that maintains compatibility:
+
+- **Direct Parameter Tools**: Handle modern format with individual parameters
+- **Legacy Schema Tools**: Support legacy format with `inputs` wrapper
+- **Shared Logic**: Both conventions use the same underlying implementation
+- **Schema Validation**: Pydantic validation preserved for both formats
+
+This approach ensures maximum compatibility while maintaining clean, maintainable code.
+
 ## 🌐 HTTP API Endpoints (v1.1.0)
 
 The HTTP transport provides these endpoints for web integration:
