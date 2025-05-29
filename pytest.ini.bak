@@ -1,5 +1,0 @@
-[pytest]
-pythonpath = .
-anyio_backend = asyncio
-filterwarnings =
-    ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning:starlette\.formparsers

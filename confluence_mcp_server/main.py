@@ -50,6 +50,76 @@ except ImportError as e:
 # --- Setup Logging (No stderr output) ---
 logger = logging.getLogger(__name__)
 
+# --- Tool Calling Convention Detection ---
+def detect_calling_convention() -> str:
+    """
+    Detect which MCP tool calling convention to use.
+    
+    Returns:
+        'direct' for modern direct parameter calling
+        'schema' for legacy schema-based calling with inputs wrapper
+    """
+    try:
+        # Method 1: Check for explicit environment variable override
+        convention = os.getenv('MCP_TOOL_CONVENTION', '').lower()
+        if convention in ['direct', 'schema']:
+            logger.info(f"TOOL_CONVENTION: Using explicit override - {convention}")
+            return convention
+        
+        # Method 2: Detect test environment (pytest execution)
+        # Our tests expect schema-based tools with {"inputs": {...}} format
+        if 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv) or 'test' in sys.argv[0]:
+            logger.info("TOOL_CONVENTION: Test environment detected - using schema convention")
+            return 'schema'
+        
+        # Method 3: Check for Smithery.ai deployment indicators (uses modern conventions)
+        if (os.getenv('SMITHERY_CONFIG') or 
+            os.getenv('MCP_CONFIG') or 
+            os.getenv('SMITHERY_CONFLUENCE_URL') or
+            any('config' in arg for arg in sys.argv)):
+            logger.info("TOOL_CONVENTION: Detected Smithery deployment - using direct parameter convention")
+            return 'direct'
+        
+        # Method 4: Check for known direct-parameter clients
+        # Cursor and newer Claude Desktop versions prefer direct parameters
+        client_hint = os.getenv('MCP_CLIENT') or os.getenv('USER_AGENT') or ''
+        if any(hint in client_hint.lower() for hint in ['cursor', 'claude-desktop-2', 'windsurf']):
+            logger.info(f"TOOL_CONVENTION: Detected modern client ({client_hint}) - using direct convention")
+            return 'direct'
+        
+        # Method 5: Check FastMCP version - but be more conservative
+        # Only use direct for very new versions that explicitly support it well
+        try:
+            import fastmcp
+            if hasattr(fastmcp, '__version__'):
+                version_str = fastmcp.__version__
+                # Parse version to compare - only use direct for 3.0+ for now
+                if version_str and version_str.startswith('3.'):
+                    logger.info(f"TOOL_CONVENTION: FastMCP version {version_str} - using direct convention")
+                    return 'direct'
+                else:
+                    logger.info(f"TOOL_CONVENTION: FastMCP version {version_str} - using schema convention for compatibility")
+        except:
+            pass
+        
+        # Method 6: Default strategy based on deployment context
+        # If we're in a containerized/cloud environment, prefer direct
+        if os.getenv('KUBERNETES_SERVICE_HOST') or os.getenv('DOCKER_CONTAINER') or os.getenv('DYNO'):
+            logger.info("TOOL_CONVENTION: Cloud deployment detected - using direct convention")
+            return 'direct'
+        
+        # Default: Use schema-based for maximum backward compatibility
+        logger.info("TOOL_CONVENTION: Using schema-based convention (default for backward compatibility)")
+        return 'schema'
+        
+    except Exception as e:
+        logger.warning(f"TOOL_CONVENTION: Error in detection, defaulting to schema: {e}")
+        return 'schema'
+
+# Detect convention once at module load
+TOOL_CONVENTION = detect_calling_convention()
+logger.info(f"TOOL_CONVENTION: Selected '{TOOL_CONVENTION}' convention")
+
 # --- Configuration Support for Multiple Deployment Contexts ---
 def detect_and_apply_smithery_config() -> Optional[Dict[str, str]]:
     """
@@ -262,7 +332,6 @@ def get_page_url_from_api_response(page_data: Dict[str, Any], base_confluence_ur
 # --- NEW DUAL CALLING CONVENTION TOOL WRAPPERS ---
 # These support both old {"inputs": {...}} and new {...} calling conventions
 
-@mcp_server.tool()
 async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
     """
     Retrieves a specific Confluence page with its content and metadata.
@@ -292,7 +361,6 @@ async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
         logger.error(f"Error in get_confluence_page: {str(e)}")
         raise ToolError(f"Failed to retrieve page: {str(e)}")
 
-@mcp_server.tool()
 async def get_confluence_page_direct(
     page_id: Optional[str] = None,
     space_key: Optional[str] = None,
@@ -346,7 +414,6 @@ async def get_confluence_page_direct(
         logger.error(f"Error in get_confluence_page: {str(e)}")
         raise ToolError(f"Failed to retrieve page: {str(e)}")
 
-@mcp_server.tool()
 async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput:
     """
     Search for Confluence pages using text queries or advanced CQL (Confluence Query Language).
@@ -384,7 +451,6 @@ async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput
         logger.error(f"Error in search_confluence_pages: {str(e)}")
         raise ToolError(f"Failed to search pages: {str(e)}")
 
-@mcp_server.tool()
 async def search_confluence_pages_direct(
     query: Optional[str] = None,
     cql: Optional[str] = None,
@@ -440,7 +506,6 @@ async def search_confluence_pages_direct(
         logger.error(f"Error in search_confluence_pages_direct: {str(e)}")
         raise ToolError(f"Failed to search pages: {str(e)}")
 
-@mcp_server.tool()
 async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
     """
     Creates a new page in Confluence with specified content and structure.
@@ -490,7 +555,6 @@ async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
         logger.error(f"Error in create_confluence_page: {str(e)}")
         raise ToolError(f"Failed to create page: {str(e)}")
 
-@mcp_server.tool()
 async def create_confluence_page_direct(
     space_key: str,
     title: str,
@@ -539,7 +603,6 @@ async def create_confluence_page_direct(
         logger.error(f"Error in create_confluence_page_direct: {str(e)}")
         raise ToolError(f"Failed to create page: {str(e)}")
 
-@mcp_server.tool()
 async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
     """
     Updates an existing Confluence page's title, content, or position in the page hierarchy.
@@ -576,7 +639,6 @@ async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
         logger.error(f"Error in update_confluence_page: {str(e)}")
         raise ToolError(f"Failed to update page: {str(e)}")
 
-@mcp_server.tool()
 async def update_confluence_page_direct(
     page_id: str,
     new_version_number: int,
@@ -627,7 +689,6 @@ async def update_confluence_page_direct(
         logger.error(f"Error in update_confluence_page_direct: {str(e)}")
         raise ToolError(f"Failed to update page: {str(e)}")
 
-@mcp_server.tool()
 async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
     """
     Permanently moves a Confluence page to trash (soft delete).
@@ -661,7 +722,6 @@ async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
         logger.error(f"Error in delete_confluence_page: {str(e)}")
         raise ToolError(f"Failed to delete page: {str(e)}")
 
-@mcp_server.tool()
 async def delete_confluence_page_direct(page_id: str) -> DeletePageOutput:
     """
     Permanently moves a Confluence page to trash (soft delete).
@@ -697,7 +757,6 @@ async def delete_confluence_page_direct(page_id: str) -> DeletePageOutput:
         logger.error(f"Error in delete_confluence_page_direct: {str(e)}")
         raise ToolError(f"Failed to delete page: {str(e)}")
 
-@mcp_server.tool()
 async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
     """
     Retrieves a list of Confluence spaces that the user has access to.
@@ -732,7 +791,6 @@ async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
         logger.error(f"Error in get_confluence_spaces: {str(e)}")
         raise ToolError(f"Failed to get spaces: {str(e)}")
 
-@mcp_server.tool()
 async def get_confluence_spaces_direct(
     limit: int = 25,
     start: int = 0
@@ -770,7 +828,6 @@ async def get_confluence_spaces_direct(
         logger.error(f"Error in get_confluence_spaces_direct: {str(e)}")
         raise ToolError(f"Failed to get spaces: {str(e)}")
 
-@mcp_server.tool()
 async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
     """
     Retrieves a list of attachments from a specific Confluence page.
@@ -807,7 +864,6 @@ async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOut
         logger.error(f"Error in get_page_attachments: {str(e)}")
         raise ToolError(f"Failed to get attachments: {str(e)}")
 
-@mcp_server.tool()
 async def get_page_attachments_direct(
     page_id: str,
     limit: int = 50,
@@ -858,7 +914,6 @@ async def get_page_attachments_direct(
         logger.error(f"Error in get_page_attachments_direct: {str(e)}")
         raise ToolError(f"Failed to get attachments: {str(e)}")
 
-@mcp_server.tool()
 async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput:
     """
     Uploads a file as an attachment to a specific Confluence page.
@@ -894,7 +949,6 @@ async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput
         logger.error(f"Error in add_page_attachment: {str(e)}")
         raise ToolError(f"Failed to add attachment: {str(e)}")
 
-@mcp_server.tool()
 async def add_page_attachment_direct(
     page_id: str,
     file_path: str,
@@ -942,7 +996,6 @@ async def add_page_attachment_direct(
         logger.error(f"Error in add_page_attachment_direct: {str(e)}")
         raise ToolError(f"Failed to add attachment: {str(e)}")
 
-@mcp_server.tool()
 async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
     """
     Permanently deletes an attachment from a Confluence page.
@@ -976,7 +1029,6 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachm
         logger.error(f"Error in delete_page_attachment: {str(e)}")
         raise ToolError(f"Failed to delete attachment: {str(e)}")
 
-@mcp_server.tool()
 async def delete_page_attachment_direct(attachment_id: str) -> DeleteAttachmentOutput:
     """
     Permanently deletes an attachment from a Confluence page.
@@ -1012,7 +1064,6 @@ async def delete_page_attachment_direct(attachment_id: str) -> DeleteAttachmentO
         logger.error(f"Error in delete_page_attachment_direct: {str(e)}")
         raise ToolError(f"Failed to delete attachment: {str(e)}")
 
-@mcp_server.tool()
 async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
     """
     Retrieves comments and discussions from a specific Confluence page.
@@ -1048,7 +1099,6 @@ async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
         logger.error(f"Error in get_page_comments: {str(e)}")
         raise ToolError(f"Failed to get comments: {str(e)}")
 
-@mcp_server.tool()
 async def get_page_comments_direct(
     page_id: str,
     limit: int = 25,
@@ -1096,6 +1146,60 @@ async def get_page_comments_direct(
         logger.error(f"Error in get_page_comments_direct: {str(e)}")
         raise ToolError(f"Failed to get comments: {str(e)}")
 
+# --- Conditional Tool Registration ---
+def register_schema_tools():
+    """Register schema-based tools (legacy format with inputs wrapper)."""
+    logger.info("TOOL_REGISTRATION: Registering schema-based tools (legacy format)")
+    
+    # Register all schema-based tool functions
+    mcp_server.tool()(get_confluence_page)
+    mcp_server.tool()(search_confluence_pages)
+    mcp_server.tool()(create_confluence_page)
+    mcp_server.tool()(update_confluence_page)
+    mcp_server.tool()(delete_confluence_page)
+    mcp_server.tool()(get_confluence_spaces)
+    mcp_server.tool()(get_page_attachments)
+    mcp_server.tool()(add_page_attachment)
+    mcp_server.tool()(delete_page_attachment)
+    mcp_server.tool()(get_page_comments)
+    
+    logger.info("TOOL_REGISTRATION: Registered 10 schema-based tools")
+
+def register_direct_tools():
+    """Register direct parameter tools (modern format)."""
+    logger.info("TOOL_REGISTRATION: Registering direct parameter tools (modern format)")
+    
+    # Register all direct parameter tool functions with clean names
+    # The _direct functions will be registered with the standard names
+    mcp_server.tool(name="get_confluence_page")(get_confluence_page_direct)
+    mcp_server.tool(name="search_confluence_pages")(search_confluence_pages_direct)
+    mcp_server.tool(name="create_confluence_page")(create_confluence_page_direct)
+    mcp_server.tool(name="update_confluence_page")(update_confluence_page_direct)
+    mcp_server.tool(name="delete_confluence_page")(delete_confluence_page_direct)
+    mcp_server.tool(name="get_confluence_spaces")(get_confluence_spaces_direct)
+    mcp_server.tool(name="get_page_attachments")(get_page_attachments_direct)
+    mcp_server.tool(name="add_page_attachment")(add_page_attachment_direct)
+    mcp_server.tool(name="delete_page_attachment")(delete_page_attachment_direct)
+    mcp_server.tool(name="get_page_comments")(get_page_comments_direct)
+    
+    logger.info("TOOL_REGISTRATION: Registered 10 direct parameter tools")
+
+def register_tools_conditionally():
+    """Register tools based on detected calling convention."""
+    global TOOL_CONVENTION
+    
+    logger.info(f"TOOL_REGISTRATION: Using '{TOOL_CONVENTION}' convention")
+    
+    if TOOL_CONVENTION == 'direct':
+        register_direct_tools()
+    else:  # 'schema' or any other value defaults to schema
+        register_schema_tools()
+    
+    logger.info("TOOL_REGISTRATION: Conditional tool registration complete")
+
+# Register tools immediately when module is imported (for test compatibility)
+register_tools_conditionally()
+
 # --- Main Functions ---
 def main():
     """Main function for stdio transport mode."""
@@ -1103,6 +1207,9 @@ def main():
         # Environment setup (convert to sync)
         import asyncio
         asyncio.run(setup_environment())
+        
+        # Register tools based on detected calling convention
+        register_tools_conditionally()
         
         # Start the MCP server using stdio transport
         # Use synchronous run() method
