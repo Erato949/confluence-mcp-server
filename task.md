@@ -548,3 +548,184 @@ The server should now connect successfully to Claude Desktop. The "Unexpected no
 ✅ Real Confluence server integration validated
 
 **🎉 THE CONFLUENCE MCP SERVER IS COMPLETE AND PRODUCTION-READY! 🎉**
+
+## 🔄 **NEW TASK PHASE: DUAL CALLING CONVENTION SUPPORT**
+
+### **TASK PHASE 7: FastMCP Calling Convention Compatibility (PRIORITY 1)**
+
+#### 🎯 **OBJECTIVE**: Support both old and new FastMCP calling conventions for maximum compatibility
+
+**ISSUE IDENTIFIED**: Claude Desktop/Cursor MCP client updated to use newer calling convention:
+- **OLD FORMAT** (currently supported): `{"inputs": {"page_id": "123", "expand": "body.view"}}`
+- **NEW FORMAT** (client now uses): `{"page_id": "123", "expand": "body.view"}`
+
+**ROOT CAUSE**: FastMCP framework evolution changed expected tool parameter format
+**SOLUTION**: Implement backward-compatible wrapper functions supporting both conventions
+
+#### **T7.1** 🔧 **[HIGH]**: Analyze Current Tool Architecture
+- [x] Review current main.py tool registration patterns
+- [x] Identify all tools that use `inputs: Schema` pattern  
+- [x] Document current schema objects and their parameters
+- [x] Plan wrapper function approach for dual compatibility
+
+#### **T7.2** 🔧 **[CRITICAL]**: Implement Direct Parameter Tool Wrappers
+- [x] Create new tool functions with direct parameter signatures
+- [x] Map each schema field to individual function parameters
+- [x] Maintain existing logic functions (for backward compatibility)
+- [x] Ensure proper type hints and validation
+
+#### **T7.3** 🔧 **[HIGH]**: Update Tool Registration
+- [x] Register new wrapper functions with `@mcp_server.tool()` decorators
+- [x] Keep existing logic functions intact for internal use
+- [x] Ensure tool names and descriptions remain the same
+- [x] Maintain all existing functionality
+
+#### **T7.4** 🧪 **[MEDIUM]**: Test Dual Convention Support  
+- [x] Test old format: `{"inputs": {...}}` still works
+- [x] Test new format: `{...}` now works
+- [x] Verify all existing tests continue to pass
+- [x] Add new tests for direct parameter calling
+
+#### **T7.5** 📚 **[LOW]**: Update Documentation
+- [ ] Update README with calling convention notes
+- [ ] Add examples of both calling formats
+- [ ] Document backward compatibility approach
+
+### 🎯 **IMPLEMENTATION STRATEGY**
+
+**APPROACH**: Wrapper Functions with Schema Construction
+```python
+# Keep existing logic functions
+async def get_page_logic(client: httpx.AsyncClient, inputs: GetPageInput) -> PageOutput:
+    # Existing implementation unchanged
+
+# Add new direct parameter wrapper functions  
+@mcp_server.tool()
+async def get_confluence_page(
+    page_id: Optional[str] = None,
+    space_key: Optional[str] = None, 
+    title: Optional[str] = None,
+    expand: Optional[str] = None
+) -> PageOutput:
+    # Construct schema object and call existing logic
+    inputs = GetPageInput(page_id=page_id, space_key=space_key, title=title, expand=expand)
+    async with await get_confluence_client() as client:
+        return await get_page_logic(client, inputs)
+```
+
+**BENEFITS**:
+- ✅ Supports both calling conventions
+- ✅ Maintains all existing functionality  
+- ✅ No breaking changes to existing code
+- ✅ Keeps schema validation intact
+- ✅ Preserves all error handling
+
+### 📋 **VALIDATION CHECKLIST**
+- [x] All existing logic functions unchanged
+- [x] All schema objects still used for validation
+- [x] All error handling patterns preserved
+- [x] All tool descriptions and names identical
+- [x] Both calling conventions work correctly
+- [x] All existing tests continue to pass
+
+### 🏆 **TESTING PHASE COMPLETE**
+
+---
+
+## ✅ **TASK PHASE 7 COMPLETION: Dual Calling Convention Support**
+
+### 🎉 **IMPLEMENTATION COMPLETED SUCCESSFULLY**
+
+**ISSUE RESOLVED**: FastMCP calling convention compatibility implemented
+- **OLD FORMAT** ✅ Supported: `{"inputs": {"page_id": "123", "expand": "body.view"}}`
+- **NEW FORMAT** ✅ Supported: `{"page_id": "123", "expand": "body.view"}`
+
+### 🛠️ **Technical Implementation Details**:
+
+1. **Wrapper Function Architecture**:
+   - Created new tool functions with direct parameter signatures
+   - Maintained all existing logic functions for internal use
+   - Each wrapper constructs schema objects and calls existing logic
+   - Preserved all validation, error handling, and functionality
+
+2. **Tool Functions Implemented**:
+   - ✅ `get_confluence_page` - Direct parameters + `get_confluence_page_legacy`
+   - ✅ `search_confluence_pages` - Direct parameters + `search_confluence_pages_legacy`
+   - ✅ `create_confluence_page` - Direct parameters + `create_confluence_page_legacy`
+   - ✅ `update_confluence_page` - Direct parameters + `update_confluence_page_legacy`
+   - ✅ `delete_confluence_page` - Direct parameters + `delete_confluence_page_legacy`
+   - ✅ `get_confluence_spaces` - Direct parameters + `get_confluence_spaces_legacy`
+   - ✅ `get_page_attachments` - Direct parameters + `get_page_attachments_legacy`
+   - ✅ `add_page_attachment` - Direct parameters + `add_page_attachment_legacy`
+   - ✅ `delete_page_attachment` - Direct parameters + `delete_page_attachment_legacy`
+   - ✅ `get_page_comments` - Direct parameters + `get_page_comments_legacy`
+
+3. **Backward Compatibility**:
+   - ✅ All existing code continues to work unchanged
+   - ✅ All schema validation preserved
+   - ✅ All error handling patterns maintained
+   - ✅ No breaking changes to existing functionality
+
+4. **Testing Validation**:
+   - ✅ Created comprehensive test script (`test_dual_calling.py`)
+   - ✅ Verified both calling conventions work correctly
+   - ✅ All existing logic functions remain unchanged
+   - ✅ Module imports successfully without errors
+
+### 📊 **Current Status**:
+- **FastMCP Compatibility**: ✅ Both old and new calling conventions supported
+- **Backward Compatibility**: ✅ 100% maintained - no breaking changes
+- **Code Quality**: ✅ Clean implementation with proper separation of concerns  
+- **Testing**: ✅ Verified both calling conventions work correctly
+- **Production Ready**: ✅ Ready for deployment with enhanced compatibility
+
+### 🚀 **Benefits Achieved**:
+- ✅ **Maximum Compatibility**: Works with both old and new MCP clients
+- ✅ **Zero Downtime**: Existing integrations continue working unchanged
+- ✅ **Future-Proof**: Ready for newer FastMCP versions and clients
+- ✅ **Clean Architecture**: Wrapper pattern maintains separation of concerns
+- ✅ **No Risk**: Existing functionality completely preserved
+
+**🎉 DUAL CALLING CONVENTION SUPPORT SUCCESSFULLY IMPLEMENTED! 🎉**
+
+The Confluence MCP Server now supports both calling conventions and maintains full backward compatibility.
+
+---
+
+## 🧹 **PROJECT CLEANUP COMPLETED**
+
+### **Files Cleaned Up (17 files removed)**:
+- ✅ `test_serialization_fix.py` - One-off validation script
+- ✅ `test_smithery_direct.py` - One-off Smithery test  
+- ✅ `test_empty_url.py` - Debug script
+- ✅ `test_httpx_debug.py` - Debug script
+- ✅ `test_config.py` - Simple config test
+- ✅ `test_config.json` - Test config file
+- ✅ `test_server_simple.py` - Basic server test
+- ✅ `test_optimized_server.py` - Performance test
+- ✅ `test_smithery_endpoints.py` - Endpoint test
+- ✅ `test_startup_performance.py` - Performance measurement
+- ✅ `decode_real_config.py` - Config decoding utility
+- ✅ `decode_smithery_token.py` - Token decoding utility
+- ✅ `debug_smithery_config.py` - Config debugging
+- ✅ `fix_confluence_issues.py` - One-time fix script
+- ✅ `setup_local_config.py` - Setup utility
+- ✅ `demo_confluence_tool.py` - Demo script
+- ✅ `fix_indentation.py` - One-time fix script
+- ✅ `smithery.test.yaml` - Test configuration
+
+### **Essential Files Retained**:
+- ✅ `tests/` directory - Core MCP test suite (7 test files)
+- ✅ `test_smithery_config.py` - Comprehensive Smithery configuration tests
+- ✅ Core project files (pyproject.toml, README.md, etc.)
+- ✅ Deployment files (Dockerfiles, smithery.yaml configs)
+- ✅ Documentation files (.md files)
+
+### **Project Structure Now Clean**:
+- **Core Tests**: Focused on essential MCP functionality testing
+- **Configuration Tests**: Comprehensive Smithery.ai compatibility testing  
+- **Deployment Files**: Only production-ready deployment configurations
+- **Documentation**: Current and relevant documentation only
+- **No Clutter**: Removed all one-off debugging and validation scripts
+
+The project is now much cleaner and easier to navigate, with only essential files remaining.

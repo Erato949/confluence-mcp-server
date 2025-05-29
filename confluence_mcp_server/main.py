@@ -237,8 +237,38 @@ async def get_confluence_client() -> httpx.AsyncClient:
 
 # --- MCP Tool Definitions ---
 
+# Placeholder for the utility function if not created yet
+# In a real scenario, this would be in confluence_mcp_server/utils/confluence_utils.py
+def get_page_url_from_api_response(page_data: Dict[str, Any], base_confluence_url: Optional[str]) -> Optional[str]:
+    if not base_confluence_url:
+        return None
+    api_links = page_data.get('_links', {})
+    webui_link = api_links.get('webui') # typically like '/display/SPACEKEY/Page+Title' or '/pages/12345'
+    base_link = api_links.get('base') # typically the Confluence base URL
+
+    if webui_link and base_link:
+        # Ensure no double slashes if webui_link is absolute or base_link already has context path
+        # This logic might need refinement based on actual link formats
+        if webui_link.startswith('http'): # if webui_link is already absolute
+            return webui_link
+        return str(base_link).rstrip('/') + str(webui_link)
+    
+    # Fallback if _links.webui is not present but page_id is
+    page_id = page_data.get('id')
+    if page_id:
+        return f"{str(base_confluence_url).rstrip('/')}/pages/viewpage.action?pageId={page_id}"
+    return None
+
+# --- NEW DUAL CALLING CONVENTION TOOL WRAPPERS ---
+# These support both old {"inputs": {...}} and new {...} calling conventions
+
 @mcp_server.tool()
-async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
+async def get_confluence_page(
+    page_id: Optional[str] = None,
+    space_key: Optional[str] = None,
+    title: Optional[str] = None,
+    expand: Optional[str] = None
+) -> PageOutput:
     """
     Retrieves a specific Confluence page with its content and metadata.
     
@@ -259,6 +289,13 @@ async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
     - Common expand values: 'body.view' (HTML content), 'body.storage' (raw format), 'version', 'space'
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = GetPageInput(
+            page_id=page_id,
+            space_key=space_key,
+            title=title,
+            expand=expand
+        )
         async with await get_confluence_client() as client:
             result = await page_actions.get_page_logic(client, inputs)
             return result
@@ -267,7 +304,15 @@ async def get_confluence_page(inputs: GetPageInput) -> PageOutput:
         raise ToolError(f"Failed to retrieve page: {str(e)}")
 
 @mcp_server.tool()
-async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput:
+async def search_confluence_pages(
+    query: Optional[str] = None,
+    cql: Optional[str] = None,
+    space_key: Optional[str] = None,
+    limit: int = 25,
+    start: int = 0,
+    expand: Optional[str] = None,
+    excerpt: Optional[str] = None
+) -> SearchPagesOutput:
     """
     Search for Confluence pages using text queries or advanced CQL (Confluence Query Language).
     
@@ -297,6 +342,16 @@ async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput
     - Increase 'limit' for more results (max 100)
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = SearchPagesInput(
+            query=query,
+            cql=cql,
+            space_key=space_key,
+            limit=limit,
+            start=start,
+            expand=expand,
+            excerpt=excerpt
+        )
         async with await get_confluence_client() as client:
             result = await page_actions.search_pages_logic(client, inputs)
             return result
@@ -305,7 +360,12 @@ async def search_confluence_pages(inputs: SearchPagesInput) -> SearchPagesOutput
         raise ToolError(f"Failed to search pages: {str(e)}")
 
 @mcp_server.tool()
-async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
+async def create_confluence_page(
+    space_key: str,
+    title: str,
+    content: str,
+    parent_page_id: Optional[str] = None
+) -> CreatePageOutput:
     """
     Creates a new page in Confluence with specified content and structure.
     
@@ -334,6 +394,13 @@ async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
     - Consider page templates for consistent formatting
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = CreatePageInput(
+            space_key=space_key,
+            title=title,
+            content=content,
+            parent_page_id=parent_page_id
+        )
         async with await get_confluence_client() as client:
             result = await page_actions.create_page_logic(client, inputs)
             return result
@@ -342,7 +409,13 @@ async def create_confluence_page(inputs: CreatePageInput) -> CreatePageOutput:
         raise ToolError(f"Failed to create page: {str(e)}")
 
 @mcp_server.tool()
-async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
+async def update_confluence_page(
+    page_id: str,
+    new_version_number: int,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    parent_page_id: Optional[str] = None
+) -> UpdatePageOutput:
     """
     Updates an existing Confluence page's title, content, or position in the page hierarchy.
     
@@ -371,6 +444,14 @@ async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
     - Preserve existing formatting when updating content
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = UpdatePageInput(
+            page_id=page_id,
+            new_version_number=new_version_number,
+            title=title,
+            content=content,
+            parent_page_id=parent_page_id
+        )
         async with await get_confluence_client() as client:
             result = await page_actions.update_page_logic(client, inputs)
             return result
@@ -379,7 +460,7 @@ async def update_confluence_page(inputs: UpdatePageInput) -> UpdatePageOutput:
         raise ToolError(f"Failed to update page: {str(e)}")
 
 @mcp_server.tool()
-async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
+async def delete_confluence_page(page_id: str) -> DeletePageOutput:
     """
     Deletes a Confluence page by moving it to trash (not permanent deletion).
     
@@ -405,6 +486,8 @@ async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
     - For permanent deletion, use Confluence admin interface
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = DeletePageInput(page_id=page_id)
         async with await get_confluence_client() as client:
             result = await page_actions.delete_page_logic(client, inputs)
             return result
@@ -413,7 +496,10 @@ async def delete_confluence_page(inputs: DeletePageInput) -> DeletePageOutput:
         raise ToolError(f"Failed to delete page: {str(e)}")
 
 @mcp_server.tool()
-async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
+async def get_confluence_spaces(
+    limit: int = 25,
+    start: int = 0
+) -> GetSpacesOutput:
     """
     Retrieves a list of Confluence spaces that the user has access to.
     
@@ -440,6 +526,8 @@ async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
     - Global spaces are shared across the organization
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = GetSpacesInput(limit=limit, start=start)
         async with await get_confluence_client() as client:
             result = await space_actions.get_spaces_logic(client, inputs)
             return result
@@ -448,7 +536,13 @@ async def get_confluence_spaces(inputs: GetSpacesInput) -> GetSpacesOutput:
         raise ToolError(f"Failed to retrieve spaces: {str(e)}")
 
 @mcp_server.tool()
-async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
+async def get_page_attachments(
+    page_id: str,
+    limit: int = 50,
+    start: int = 0,
+    filename: Optional[str] = None,
+    media_type: Optional[str] = None
+) -> GetAttachmentsOutput:
     """
     Retrieves all attachments associated with a specific Confluence page.
     
@@ -477,6 +571,14 @@ async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOut
     - Multiple versions of the same file are tracked
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = GetAttachmentsInput(
+            page_id=page_id,
+            limit=limit,
+            start=start,
+            filename=filename,
+            media_type=media_type
+        )
         async with await get_confluence_client() as client:
             result = await attachment_actions.get_attachments_logic(client, inputs)
             return result
@@ -485,7 +587,12 @@ async def get_page_attachments(inputs: GetAttachmentsInput) -> GetAttachmentsOut
         raise ToolError(f"Failed to retrieve attachments: {str(e)}")
 
 @mcp_server.tool()
-async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput:
+async def add_page_attachment(
+    page_id: str,
+    file_path: str,
+    filename_on_confluence: Optional[str] = None,
+    comment: Optional[str] = None
+) -> AddAttachmentOutput:
     """
     Uploads a file as an attachment to a specific Confluence page.
     
@@ -513,6 +620,13 @@ async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput
     - Add meaningful comments for version tracking
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = AddAttachmentInput(
+            page_id=page_id,
+            file_path=file_path,
+            filename_on_confluence=filename_on_confluence,
+            comment=comment
+        )
         async with await get_confluence_client() as client:
             result = await attachment_actions.add_attachment_logic(client, inputs)
             return result
@@ -521,7 +635,7 @@ async def add_page_attachment(inputs: AddAttachmentInput) -> AddAttachmentOutput
         raise ToolError(f"Failed to add attachment: {str(e)}")
 
 @mcp_server.tool()
-async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
+async def delete_page_attachment(attachment_id: str) -> DeleteAttachmentOutput:
     """
     Permanently deletes an attachment from a Confluence page.
     
@@ -547,6 +661,8 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachm
     - Consider updating page content that references deleted files
     """
     try:
+        # Construct schema object from direct parameters
+        inputs = DeleteAttachmentInput(attachment_id=attachment_id)
         async with await get_confluence_client() as client:
             result = await attachment_actions.delete_attachment_logic(client, inputs)
             return result
@@ -555,7 +671,12 @@ async def delete_page_attachment(inputs: DeleteAttachmentInput) -> DeleteAttachm
         raise ToolError(f"Failed to delete attachment: {str(e)}")
 
 @mcp_server.tool()
-async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
+async def get_page_comments(
+    page_id: str,
+    limit: int = 25,
+    start: int = 0,
+    expand: Optional[str] = None
+) -> GetCommentsOutput:
     """
     Retrieves all comments associated with a specific Confluence page.
     
@@ -588,6 +709,144 @@ async def get_page_comments(inputs: GetCommentsInput) -> GetCommentsOutput:
     - Comments are ordered chronologically by default
     - Use pagination for pages with many comments
     """
+    try:
+        # Construct schema object from direct parameters
+        inputs = GetCommentsInput(
+            page_id=page_id,
+            limit=limit,
+            start=start,
+            expand=expand
+        )
+        async with await get_confluence_client() as client:
+            result = await comment_actions.get_comments_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_page_comments: {str(e)}")
+        raise ToolError(f"Failed to retrieve comments: {str(e)}")
+
+# --- LEGACY TOOL FUNCTIONS (for backward compatibility with {"inputs": {...}} format) ---
+# These maintain the old calling convention
+
+@mcp_server.tool()
+async def get_confluence_page_legacy(inputs: GetPageInput) -> PageOutput:
+    """
+    Retrieves a specific Confluence page with its content and metadata.
+    
+    **Use Cases:**
+    - Get page content to read or analyze
+    - Retrieve page metadata (author, version, dates)
+    - Get page structure information (parent, space)
+    
+    **Examples:**
+    - Get page by ID: `{"page_id": "123456"}`
+    - Get page by space and title: `{"space_key": "DOCS", "title": "Meeting Notes"}`
+    - Get page with expanded content: `{"page_id": "123456", "expand": "body.view,version,space"}`
+    
+    **Tips:**
+    - Use page_id when you know the exact page ID (faster)
+    - Use space_key + title for human-readable page identification
+    - Add expand parameter to get page content in the response
+    - Common expand values: 'body.view' (HTML content), 'body.storage' (raw format), 'version', 'space'
+    """
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.get_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to retrieve page: {str(e)}")
+
+@mcp_server.tool()
+async def search_confluence_pages_legacy(inputs: SearchPagesInput) -> SearchPagesOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.search_pages_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in search_confluence_pages: {str(e)}")
+        raise ToolError(f"Failed to search pages: {str(e)}")
+
+@mcp_server.tool()
+async def create_confluence_page_legacy(inputs: CreatePageInput) -> CreatePageOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.create_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in create_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to create page: {str(e)}")
+
+@mcp_server.tool()
+async def update_confluence_page_legacy(inputs: UpdatePageInput) -> UpdatePageOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.update_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in update_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to update page: {str(e)}")
+
+@mcp_server.tool()
+async def delete_confluence_page_legacy(inputs: DeletePageInput) -> DeletePageOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await page_actions.delete_page_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in delete_confluence_page: {str(e)}")
+        raise ToolError(f"Failed to delete page: {str(e)}")
+
+@mcp_server.tool()
+async def get_confluence_spaces_legacy(inputs: GetSpacesInput) -> GetSpacesOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await space_actions.get_spaces_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_confluence_spaces: {str(e)}")
+        raise ToolError(f"Failed to retrieve spaces: {str(e)}")
+
+@mcp_server.tool()
+async def get_page_attachments_legacy(inputs: GetAttachmentsInput) -> GetAttachmentsOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.get_attachments_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in get_page_attachments: {str(e)}")
+        raise ToolError(f"Failed to retrieve attachments: {str(e)}")
+
+@mcp_server.tool()
+async def add_page_attachment_legacy(inputs: AddAttachmentInput) -> AddAttachmentOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.add_attachment_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in add_page_attachment: {str(e)}")
+        raise ToolError(f"Failed to add attachment: {str(e)}")
+
+@mcp_server.tool()
+async def delete_page_attachment_legacy(inputs: DeleteAttachmentInput) -> DeleteAttachmentOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
+    try:
+        async with await get_confluence_client() as client:
+            result = await attachment_actions.delete_attachment_logic(client, inputs)
+            return result
+    except Exception as e:
+        logger.error(f"Error in delete_page_attachment: {str(e)}")
+        raise ToolError(f"Failed to delete attachment: {str(e)}")
+
+@mcp_server.tool()
+async def get_page_comments_legacy(inputs: GetCommentsInput) -> GetCommentsOutput:
+    """Legacy version that accepts inputs object for backward compatibility."""
     try:
         async with await get_confluence_client() as client:
             result = await comment_actions.get_comments_logic(client, inputs)
