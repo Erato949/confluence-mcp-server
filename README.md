@@ -111,6 +111,9 @@ AI: "Update the completion percentage in row 2, column 3 to 95%"
 
 ## 🚀 Quick Start
 
+### 📚 **New to Selective Editing?** 
+👉 **[Complete Step-by-Step Tutorial](TUTORIAL.md)** - Learn revolutionary selective editing with hands-on examples!
+
 ### Option 1: Claude Desktop (stdio transport)
 
 1. **Install Dependencies**:
@@ -187,6 +190,9 @@ AI: "Update the completion percentage in row 2, column 3 to 95%"
 ## 💬 Revolutionary AI Assistant Workflows
 
 ### 🎯 **Selective Editing Examples**
+
+**📚 Need Step-by-Step Guidance?** 
+👉 **[Complete Selective Editing Tutorial](TUTORIAL.md)** - Hands-on guide with examples, workflows, and troubleshooting
 
 **Update Project Status Without Disrupting Meeting Notes**:
 ```
