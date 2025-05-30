@@ -1212,32 +1212,97 @@ async def update_page_section(inputs: UpdatePageSectionInput) -> UpdatePageSecti
     """
     Updates a specific section of a Confluence page by replacing content under a heading.
     
-    **Revolutionary Capability:** This is part of the industry's first XML-aware selective editing system
+    **🚀 Revolutionary Capability:** Industry's first XML-aware selective editing system
     that allows surgical precision modifications without affecting surrounding content.
     
-    **Use Cases:**
-    - Update specific sections without touching other content
-    - Modify project status, meeting notes, or documentation sections
-    - Replace outdated information while preserving page structure
-    - Update content sections while maintaining macros and formatting
+    **📋 Use Cases:**
+    - Update project status sections without touching meeting notes
+    - Refresh API documentation while preserving examples and troubleshooting
+    - Update progress reports while maintaining historical context
+    - Modify specific sections of large documentation pages
     
-    **Examples:**
-    - Update status section: `{"page_id": "123456", "heading": "Project Status", "new_content": "<p>Completed</p>"}`
-    - Replace specific heading level: `{"page_id": "123456", "heading": "Overview", "heading_level": 2, "new_content": "<p>New overview</p>"}`
-    - Case-sensitive exact match: `{"page_id": "123456", "heading": "API Documentation", "exact_match": true, "case_sensitive": true, "new_content": "<p>Updated API docs</p>"}`
+    **💡 Practical Examples:**
     
-    **Key Features:**
-    - Preserves all other page content, macros, and layouts
-    - Intelligent section boundary detection
-    - Supports nested heading hierarchies
-    - Maintains XML structure and formatting
-    - Automatic backup for rollback capability
+    **Example 1: Update Project Status**
+    ```json
+    {
+        "page_id": "123456789",
+        "heading": "Project Status",
+        "new_content": "<p><strong>Status:</strong> Completed ✅</p><p><strong>Completion Date:</strong> 2024-01-15</p><p><strong>Next Steps:</strong> Deploy to production</p>"
+    }
+    ```
     
-    **Tips:**
-    - Use heading_level to target specific heading depths
-    - Enable exact_match for precise targeting when multiple similar headings exist
-    - Content should be in Confluence storage format (HTML-like)
-    - Operation preserves all content outside the target section
+    **Example 2: Update Meeting Notes Section**
+    ```json
+    {
+        "page_id": "987654321", 
+        "heading": "Action Items",
+        "new_content": "<ul><li>John: Review API endpoints by Friday</li><li>Sarah: Update documentation by Monday</li><li>Team: Schedule follow-up meeting</li></ul>"
+    }
+    ```
+    
+    **Example 3: Precise Heading Level Targeting**
+    ```json
+    {
+        "page_id": "456789123",
+        "heading": "Overview",
+        "heading_level": 2,
+        "new_content": "<p>This updated overview reflects the latest changes...</p>",
+        "exact_match": true
+    }
+    ```
+    
+    **Example 4: Case-Sensitive Technical Documentation**
+    ```json
+    {
+        "page_id": "789123456",
+        "heading": "API Endpoints",
+        "case_sensitive": true,
+        "exact_match": true,
+        "new_content": "<h3>GET /api/v2/users</h3><p>Returns user list with pagination...</p>"
+    }
+    ```
+    
+    **🛠️ Key Features:**
+    - **Structure Preservation**: Maintains all macros, layouts, and formatting outside target section
+    - **Intelligent Targeting**: Finds headings by text with flexible matching options
+    - **Nested Support**: Handles complex heading hierarchies correctly
+    - **Safe Editing**: Automatic backup creation for rollback capability
+    - **XML Integrity**: Preserves Confluence storage format structure
+    
+    **⚙️ Parameter Guide:**
+    - `page_id`: Get from search_confluence_pages or page URL
+    - `heading`: Text of the heading (case-insensitive by default)
+    - `new_content`: Confluence storage format (HTML-like with special elements)
+    - `heading_level`: 1-6 to target specific heading depths (optional)
+    - `exact_match`: true for precise heading text matching (optional)
+    - `case_sensitive`: true for case-sensitive heading search (optional)
+    
+    **🔗 Workflow Examples:**
+    
+    **Workflow 1: Find and Update Page Section**
+    ```
+    1. search_confluence_pages({"query": "Project Alpha", "space_key": "PROJ"})
+    2. update_page_section({"page_id": "found_id", "heading": "Status", "new_content": "<p>Updated status...</p>"})
+    ```
+    
+    **Workflow 2: Update Multiple Sections**
+    ```
+    1. update_page_section({"page_id": "123", "heading": "Summary", "new_content": "..."})
+    2. update_page_section({"page_id": "123", "heading": "Next Steps", "new_content": "..."})
+    ```
+    
+    **⚠️ Important Notes:**
+    - Content must be in Confluence storage format (HTML with special elements)
+    - Changes are immediately saved to Confluence
+    - Original content is backed up for potential rollback
+    - Only the target section is modified - all other content remains unchanged
+    
+    **🎯 Pro Tips:**
+    - Use get_confluence_page first to see current content structure
+    - Test with exact_match=true if multiple similar headings exist
+    - Use heading_level to target specific hierarchy levels
+    - Include rich formatting: tables, lists, links in new_content
     """
     try:
         async with await get_confluence_client() as client:
@@ -1305,33 +1370,137 @@ async def replace_text_pattern(inputs: ReplaceTextPatternInput) -> ReplaceTextPa
     """
     Replaces text patterns throughout a Confluence page with intelligent content preservation.
     
-    **Revolutionary Capability:** XML-aware pattern replacement that preserves macros, formatting,
-    and document structure while performing precise text substitutions.
+    **🚀 Revolutionary Capability:** XML-aware pattern replacement that preserves macros, formatting,
+    and document structure while performing precise text substitutions across entire pages.
     
-    **Use Cases:**
-    - Find and replace text across entire pages
-    - Update terminology, names, or references
-    - Bulk text corrections and updates
-    - Content standardization and consistency fixes
+    **📋 Use Cases:**
+    - Update product names, versions, or terminology across documentation
+    - Fix typos or standardize spelling throughout pages
+    - Replace outdated URLs, email addresses, or contact information
+    - Update status indicators, dates, or version numbers globally
+    - Rebrand content by replacing company names or product references
     
-    **Examples:**
-    - Simple replacement: `{"page_id": "123456", "search_pattern": "old term", "replacement": "new term"}`
-    - Case-sensitive: `{"page_id": "123456", "search_pattern": "API", "replacement": "Application Programming Interface", "case_sensitive": true}`
-    - Whole words only: `{"page_id": "123456", "search_pattern": "test", "replacement": "production", "whole_words_only": true}`
-    - Limited replacements: `{"page_id": "123456", "search_pattern": "TODO", "replacement": "COMPLETED", "max_replacements": 5}`
+    **💡 Practical Examples:**
     
-    **Key Features:**
-    - Preserves XML structure, macros, and layouts
-    - Smart content detection prevents breaking formatting
-    - Flexible matching options (case, whole words)
-    - Replacement limits for controlled changes
-    - Automatic backup for rollback capability
+    **Example 1: Update Product Version**
+    ```json
+    {
+        "page_id": "123456789",
+        "search_pattern": "v1.2.3",
+        "replacement": "v2.0.0",
+        "case_sensitive": true
+    }
+    ```
     
-    **Tips:**
-    - Use whole_words_only to avoid partial word matches
-    - Set max_replacements to limit scope of changes
-    - Test with small examples first for complex patterns
-    - Operation works on rendered text while preserving XML structure
+    **Example 2: Fix Common Typo**
+    ```json
+    {
+        "page_id": "987654321",
+        "search_pattern": "recieve",
+        "replacement": "receive",
+        "case_sensitive": false
+    }
+    ```
+    
+    **Example 3: Update Company Branding (Whole Words Only)**
+    ```json
+    {
+        "page_id": "456789123",
+        "search_pattern": "OldCorp",
+        "replacement": "NewBrand Inc",
+        "whole_words_only": true,
+        "case_sensitive": true
+    }
+    ```
+    
+    **Example 4: Limited Replacements for Testing**
+    ```json
+    {
+        "page_id": "789123456",
+        "search_pattern": "TODO",
+        "replacement": "✅ COMPLETED",
+        "max_replacements": 3,
+        "case_sensitive": false
+    }
+    ```
+    
+    **Example 5: Update Email Addresses**
+    ```json
+    {
+        "page_id": "321654987",
+        "search_pattern": "support@oldcompany.com",
+        "replacement": "help@newcompany.com",
+        "case_sensitive": true,
+        "whole_words_only": true
+    }
+    ```
+    
+    **Example 6: Update Status Indicators**
+    ```json
+    {
+        "page_id": "654987321",
+        "search_pattern": "Status: In Progress",
+        "replacement": "Status: Completed ✅",
+        "case_sensitive": false
+    }
+    ```
+    
+    **🛠️ Key Features:**
+    - **XML Structure Preservation**: Never breaks macros, links, or formatting elements
+    - **Smart Content Detection**: Distinguishes between content text and XML markup
+    - **Flexible Matching**: Case sensitivity, whole words, and replacement limits
+    - **Safe Operations**: Preserves document structure while changing text
+    - **Global Search**: Operates across entire page content efficiently
+    
+    **⚙️ Parameter Guide:**
+    - `page_id`: Target page identifier from search or URL
+    - `search_pattern`: Exact text to find (supports special characters)
+    - `replacement`: Text to substitute (can include HTML formatting)
+    - `case_sensitive`: false (default) for flexible matching, true for exact case
+    - `whole_words_only`: false (default) allows partial matches, true for complete words
+    - `max_replacements`: Optional limit to control number of changes
+    
+    **🔗 Workflow Examples:**
+    
+    **Workflow 1: Global Content Update**
+    ```
+    1. search_confluence_pages({"query": "API documentation", "space_key": "TECH"})
+    2. replace_text_pattern({"page_id": "found_id", "search_pattern": "v1.0", "replacement": "v2.0"})
+    3. Get confirmation of replacements_made count
+    ```
+    
+    **Workflow 2: Safe Incremental Updates**
+    ```
+    1. replace_text_pattern({"search_pattern": "old_term", "replacement": "new_term", "max_replacements": 1})
+    2. Review changes via page_url
+    3. Repeat with higher max_replacements if satisfied
+    ```
+    
+    **Workflow 3: Multi-Page Content Updates**
+    ```
+    1. search_confluence_pages({"query": "project documentation", "space_key": "PROJ"})
+    2. For each page: replace_text_pattern({"page_id": "page.id", "search_pattern": "OldName", "replacement": "NewName"})
+    ```
+    
+    **⚠️ Important Notes:**
+    - Operates on visible text content, not XML markup or macro parameters
+    - Changes are immediately saved to Confluence with version increment
+    - Returns count of actual replacements made
+    - Preserves all formatting, links, and special elements
+    - Use max_replacements for testing or gradual updates
+    
+    **🎯 Pro Tips:**
+    - Start with max_replacements=1 to test pattern matching
+    - Use case_sensitive=true for technical terms and proper nouns
+    - Enable whole_words_only to avoid partial word replacements
+    - Check replacements_made count to verify expected changes
+    - Use get_confluence_page first to preview content before replacing
+    
+    **⚡ Performance Notes:**
+    - Processes entire page content efficiently
+    - Handles large pages with complex formatting
+    - Maintains performance with hundreds of potential matches
+    - XML parsing optimized for Confluence storage format
     """
     try:
         async with await get_confluence_client() as client:
@@ -1404,32 +1573,169 @@ async def update_table_cell(inputs: UpdateTableCellInput) -> UpdateTableCellOutp
     """
     Updates a specific cell in a table within a Confluence page with surgical precision.
     
-    **Revolutionary Capability:** Direct table cell editing that preserves table structure,
-    formatting, and all surrounding content while modifying specific data points.
+    **🚀 Revolutionary Capability:** Direct table cell editing that preserves table structure,
+    formatting, and all surrounding content while modifying specific data points with zero-based indexing.
     
-    **Use Cases:**
-    - Update status columns in project tables
-    - Modify data values in comparison tables
-    - Correct information in existing tables
-    - Update metrics and measurements
+    **📋 Use Cases:**
+    - Update project status tables with current progress
+    - Modify data in comparison or feature matrices
+    - Update metrics, dates, or values in tracking tables
+    - Correct information in existing documentation tables
+    - Update pricing, specifications, or contact information
     
-    **Examples:**
-    - Update first table, second row, third column: `{"page_id": "123456", "table_index": 0, "row_index": 1, "column_index": 2, "new_cell_content": "Completed"}`
-    - Update status cell: `{"page_id": "123456", "table_index": 0, "row_index": 2, "column_index": 1, "new_cell_content": "<strong>In Progress</strong>"}`
-    - Update with rich content: `{"page_id": "123456", "table_index": 1, "row_index": 0, "column_index": 0, "new_cell_content": "<a href=\"#\">Updated Link</a>"}`
+    **💡 Practical Examples:**
     
-    **Key Features:**
-    - Zero-based indexing for precise cell targeting
-    - Preserves table structure and formatting
-    - Supports rich HTML content in cells
-    - Maintains all other table data unchanged
-    - Automatic backup for rollback capability
+    **Example 1: Update Project Status Table**
+    ```json
+    {
+        "page_id": "123456789",
+        "table_index": 0,
+        "row_index": 2,
+        "column_index": 1,
+        "new_cell_content": "<strong>Completed ✅</strong>"
+    }
+    ```
     
-    **Tips:**
-    - Use table_index to target specific tables when multiple exist
-    - Row and column indices start from 0
-    - Cell content can include HTML for formatting
-    - Table headers (th) and data cells (td) are both supported
+    **Example 2: Update Feature Comparison Table**
+    ```json
+    {
+        "page_id": "987654321",
+        "table_index": 0,
+        "row_index": 3,
+        "column_index": 2,
+        "new_cell_content": "Enterprise Only"
+    }
+    ```
+    
+    **Example 3: Update Metrics with Rich Formatting**
+    ```json
+    {
+        "page_id": "456789123",
+        "table_index": 1,
+        "row_index": 1,
+        "column_index": 0,
+        "new_cell_content": "<strong>99.9%</strong> <em>(improved)</em>"
+    }
+    ```
+    
+    **Example 4: Update Contact Information**
+    ```json
+    {
+        "page_id": "789123456",
+        "table_index": 0,
+        "row_index": 4,
+        "column_index": 2,
+        "new_cell_content": "<a href=\"mailto:newcontact@company.com\">newcontact@company.com</a>"
+    }
+    ```
+    
+    **Example 5: Update Date in Schedule Table**
+    ```json
+    {
+        "page_id": "321654987",
+        "table_index": 0,
+        "row_index": 2,
+        "column_index": 3,
+        "new_cell_content": "2024-02-15<br/><small>(revised)</small>"
+    }
+    ```
+    
+    **Example 6: Update First Table Header**
+    ```json
+    {
+        "page_id": "654987321",
+        "table_index": 0,
+        "row_index": 0,
+        "column_index": 1,
+        "new_cell_content": "<strong>Updated Status</strong>"
+    }
+    ```
+    
+    **🛠️ Key Features:**
+    - **Zero-Based Indexing**: table_index=0 (first table), row_index=0 (first row), column_index=0 (first column)
+    - **Structure Preservation**: Maintains table formatting, borders, and styling
+    - **Rich Content Support**: Supports HTML, links, formatting within cells
+    - **Header & Data Cells**: Works with both table headers (th) and data cells (td)
+    - **Surgical Precision**: Only the target cell is modified, all other data unchanged
+    
+    **⚙️ Parameter Guide:**
+    - `page_id`: Target page identifier (get from search or URL)
+    - `table_index`: Zero-based table number (0=first table, 1=second table, etc.)
+    - `row_index`: Zero-based row number (0=first row including headers)
+    - `column_index`: Zero-based column number (0=first column)
+    - `new_cell_content`: HTML content for the cell (can include formatting)
+    
+    **📊 Table Index Reference:**
+    ```
+    Page with multiple tables:
+    table_index: 0 = First table on page
+    table_index: 1 = Second table on page  
+    table_index: 2 = Third table on page
+    
+    Within each table (zero-based):
+    row_index: 0 = Header row (if present)
+    row_index: 1 = First data row
+    row_index: 2 = Second data row
+    
+    column_index: 0 = First column
+    column_index: 1 = Second column
+    column_index: 2 = Third column
+    ```
+    
+    **🔗 Workflow Examples:**
+    
+    **Workflow 1: Systematic Table Updates**
+    ```
+    1. get_confluence_page({"page_id": "123", "expand": "body.view"}) // Review table structure
+    2. update_table_cell({"page_id": "123", "table_index": 0, "row_index": 1, "column_index": 2, "new_cell_content": "Updated"})
+    3. update_table_cell({"page_id": "123", "table_index": 0, "row_index": 2, "column_index": 2, "new_cell_content": "Updated"})
+    ```
+    
+    **Workflow 2: Status Table Maintenance**
+    ```
+    1. search_confluence_pages({"query": "project status", "space_key": "PROJ"})
+    2. For each status row: update_table_cell({"page_id": "found_id", "table_index": 0, "row_index": N, "column_index": 1, "new_cell_content": "Complete"})
+    ```
+    
+    **Workflow 3: Bulk Table Data Updates**
+    ```
+    1. Identify table structure and dimensions
+    2. Loop through rows updating specific columns:
+       update_table_cell({"page_id": "123", "table_index": 0, "row_index": i, "column_index": 2, "new_cell_content": new_values[i]})
+    ```
+    
+    **⚠️ Important Notes:**
+    - All indices are zero-based (start counting from 0)
+    - Changes are immediately saved to Confluence
+    - Cell content can include HTML formatting and links
+    - Table structure (rows/columns) remains unchanged
+    - Original cell content is completely replaced
+    
+    **🎯 Pro Tips:**
+    - Use get_confluence_page first to inspect table structure
+    - Count tables and cells carefully - remember zero-based indexing
+    - Include formatting HTML tags for rich content presentation
+    - Test with a single cell update before bulk operations
+    - Use meaningful cell content that fits table context
+    
+    **⚡ Index Calculation Examples:**
+    ```
+    Table with 4 columns, 5 rows:
+    - Header row: row_index = 0
+    - First data row: row_index = 1  
+    - Last data row: row_index = 4
+    - First column: column_index = 0
+    - Last column: column_index = 3
+    
+    To update cell in 3rd row, 2nd column:
+    row_index = 2, column_index = 1
+    ```
+    
+    **🔍 Error Prevention:**
+    - Verify table_index exists (page may have fewer tables)
+    - Verify row_index exists (table may have fewer rows)
+    - Verify column_index exists (row may have fewer columns)
+    - Use consistent HTML formatting for professional appearance
     """
     try:
         async with await get_confluence_client() as client:
@@ -1502,16 +1808,106 @@ async def update_page_section_direct(
     exact_match: bool = False,
     case_sensitive: bool = False
 ) -> UpdatePageSectionOutput:
-    """Direct parameter version of update_page_section."""
-    inputs = UpdatePageSectionInput(
-        page_id=page_id,
-        heading=heading,
-        new_content=new_content,
-        heading_level=heading_level,
-        exact_match=exact_match,
-        case_sensitive=case_sensitive
+    """
+    Updates a specific section of a Confluence page by replacing content under a heading.
+    
+    **🚀 Revolutionary Capability:** Industry's first XML-aware selective editing system
+    that allows surgical precision modifications without affecting surrounding content.
+    
+    **📋 Use Cases:**
+    - Update project status sections without touching meeting notes
+    - Refresh API documentation while preserving examples and troubleshooting
+    - Update progress reports while maintaining historical context
+    - Modify specific sections of large documentation pages
+    
+    **💡 Practical Examples:**
+    
+    **Example 1: Update Project Status**
+    ```python
+    update_page_section_direct(
+        page_id="123456789",
+        heading="Project Status",
+        new_content="<p><strong>Status:</strong> Completed ✅</p><p><strong>Completion Date:</strong> 2024-01-15</p><p><strong>Next Steps:</strong> Deploy to production</p>"
     )
-    return await update_page_section(inputs)
+    ```
+    
+    **Example 2: Update Meeting Notes Section**
+    ```python
+    update_page_section_direct(
+        page_id="987654321",
+        heading="Action Items",
+        new_content="<ul><li>John: Review API endpoints by Friday</li><li>Sarah: Update documentation by Monday</li><li>Team: Schedule follow-up meeting</li></ul>"
+    )
+    ```
+    
+    **Example 3: Precise Heading Level Targeting**
+    ```python
+    update_page_section_direct(
+        page_id="456789123",
+        heading="Overview",
+        heading_level=2,
+        new_content="<p>This updated overview reflects the latest changes...</p>",
+        exact_match=True
+    )
+    ```
+    
+    **🛠️ Key Features:**
+    - **Structure Preservation**: Maintains all macros, layouts, and formatting outside target section
+    - **Intelligent Targeting**: Finds headings by text with flexible matching options
+    - **Nested Support**: Handles complex heading hierarchies correctly
+    - **Safe Editing**: Automatic backup creation for rollback capability
+    - **XML Integrity**: Preserves Confluence storage format structure
+    
+    **⚙️ Parameter Guide:**
+    - `page_id`: Get from search_confluence_pages or page URL
+    - `heading`: Text of the heading (case-insensitive by default)
+    - `new_content`: Confluence storage format (HTML-like with special elements)
+    - `heading_level`: 1-6 to target specific heading depths (optional)
+    - `exact_match`: true for precise heading text matching (optional)
+    - `case_sensitive`: true for case-sensitive heading search (optional)
+    
+    **🔗 Workflow Examples:**
+    
+    **Workflow 1: Find and Update Page Section**
+    ```python
+    # 1. Find the page
+    pages = search_confluence_pages_direct(query="Project Alpha", space_key="PROJ")
+    page_id = pages.results[0].page_id
+    
+    # 2. Update specific section
+    result = update_page_section_direct(
+        page_id=page_id,
+        heading="Status",
+        new_content="<p>Updated status...</p>"
+    )
+    ```
+    
+    **⚠️ Important Notes:**
+    - Content must be in Confluence storage format (HTML with special elements)
+    - Changes are immediately saved to Confluence
+    - Original content is backed up for potential rollback
+    - Only the target section is modified - all other content remains unchanged
+    
+    **🎯 Pro Tips:**
+    - Use get_confluence_page first to see current content structure
+    - Test with exact_match=true if multiple similar headings exist
+    - Use heading_level to target specific hierarchy levels
+    - Include rich formatting: tables, lists, links in new_content
+    """
+    try:
+        # Construct schema object from direct parameters
+        inputs = UpdatePageSectionInput(
+            page_id=page_id,
+            heading=heading,
+            new_content=new_content,
+            heading_level=heading_level,
+            exact_match=exact_match,
+            case_sensitive=case_sensitive
+        )
+        return await update_page_section(inputs)
+    except Exception as e:
+        logger.error(f"Error in update_page_section_direct: {str(e)}")
+        raise ToolError(f"Failed to update page section: {str(e)}")
 
 async def replace_text_pattern_direct(
     page_id: str,
