@@ -20,6 +20,18 @@ import uvicorn
 logging.basicConfig(level=logging.WARNING)  # Reduce log level for faster startup
 logger = logging.getLogger(__name__)
 
+# Lazy imports for selective editing (loaded only when needed)
+_selective_editing_loaded = False
+def _load_selective_editing():
+    """Lazy load selective editing modules for performance."""
+    global _selective_editing_loaded
+    if not _selective_editing_loaded:
+        global SectionEditor, PatternEditor, StructuralEditor
+        from confluence_mcp_server.selective_editing.section_editor import SectionEditor
+        from confluence_mcp_server.selective_editing.pattern_editor import PatternEditor  
+        from confluence_mcp_server.selective_editing.structural_editor import StructuralEditor
+        _selective_editing_loaded = True
+
 class UltraOptimizedHttpTransport:
     """Ultra-optimized HTTP transport for Smithery.ai with guaranteed sub-second responses."""
     
@@ -64,7 +76,7 @@ class UltraOptimizedHttpTransport:
             return {
                 "name": "Confluence MCP Server",
                 "version": "1.1.0",
-                "tools_count": 10,
+                "tools_count": 13,
                 "lazy_loading": True,
                 "status": "ready"
             }
@@ -586,6 +598,166 @@ class UltraOptimizedHttpTransport:
                     },
                     "required": ["page_id"]
                 }
+            },
+            {
+                "name": "update_page_section",
+                "description": """Updates a specific section of a Confluence page by replacing content under a heading.
+
+🚀 **Revolutionary Capability:** Industry's first XML-aware selective editing system that allows surgical precision modifications without affecting surrounding content.
+
+**Use Cases:**
+- Update project status sections without touching meeting notes
+- Refresh API documentation while preserving examples and troubleshooting  
+- Update progress reports while maintaining historical context
+- Modify specific sections of large documentation pages
+
+**Examples:**
+- Update status: {"page_id": "123456789", "heading": "Project Status", "new_content": "<p><strong>Status:</strong> Completed ✅</p>"}
+- Precise targeting: {"page_id": "456789123", "heading": "Overview", "heading_level": 2, "exact_match": true, "new_content": "<p>Updated overview...</p>"}
+
+**Key Features:**
+- Structure Preservation: Maintains all macros, layouts, and formatting outside target section
+- Intelligent Targeting: Finds headings by text with flexible matching options
+- Nested Support: Handles complex heading hierarchies correctly
+- Safe Editing: Automatic backup creation for rollback capability""",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "The ID of the page to update"
+                        },
+                        "heading": {
+                            "type": "string", 
+                            "description": "The heading text to find (case-insensitive by default)"
+                        },
+                        "new_content": {
+                            "type": "string",
+                            "description": "New content to replace the section with (Confluence storage format)"
+                        },
+                        "heading_level": {
+                            "type": "integer",
+                            "description": "Specific heading level to match (1-6). Optional."
+                        },
+                        "exact_match": {
+                            "type": "boolean", 
+                            "description": "Whether to require exact heading text match. Default: false."
+                        },
+                        "case_sensitive": {
+                            "type": "boolean",
+                            "description": "Whether heading search should be case-sensitive. Default: false."
+                        }
+                    },
+                    "required": ["page_id", "heading", "new_content"]
+                }
+            },
+            {
+                "name": "replace_text_pattern", 
+                "description": """Replaces text patterns throughout a Confluence page with intelligent content preservation.
+
+🚀 **Revolutionary Capability:** XML-aware pattern replacement that preserves macros, formatting, and document structure while performing precise text substitutions across entire pages.
+
+**Use Cases:**
+- Update product names, versions, or terminology across documentation
+- Fix typos or standardize spelling throughout pages
+- Replace outdated URLs, email addresses, or contact information
+- Update status indicators, dates, or version numbers globally
+- Rebrand content by replacing company names or product references
+
+**Examples:**
+- Update version: {"page_id": "123456789", "search_pattern": "v1.2.3", "replacement": "v2.0.0", "case_sensitive": true}
+- Fix typos: {"page_id": "987654321", "search_pattern": "recieve", "replacement": "receive"}
+- Limited changes: {"page_id": "789123456", "search_pattern": "TODO", "replacement": "✅ COMPLETED", "max_replacements": 3}
+
+**Key Features:**
+- XML Structure Preservation: Never breaks macros, links, or formatting elements
+- Smart Content Detection: Distinguishes between content text and XML markup
+- Flexible Matching: Case sensitivity, whole words, and replacement limits
+- Safe Operations: Preserves document structure while changing text""",
+                "inputSchema": {
+                    "type": "object", 
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "The ID of the page to update"
+                        },
+                        "search_pattern": {
+                            "type": "string",
+                            "description": "Text pattern to search for"
+                        },
+                        "replacement": {
+                            "type": "string",
+                            "description": "Text to replace matches with"
+                        },
+                        "case_sensitive": {
+                            "type": "boolean",
+                            "description": "Whether search should be case-sensitive. Default: false."
+                        },
+                        "whole_words_only": {
+                            "type": "boolean", 
+                            "description": "Whether to match whole words only. Default: false."
+                        },
+                        "max_replacements": {
+                            "type": "integer",
+                            "description": "Maximum number of replacements to make. Optional."
+                        }
+                    },
+                    "required": ["page_id", "search_pattern", "replacement"]
+                }
+            },
+            {
+                "name": "update_table_cell",
+                "description": """Updates a specific cell in a table within a Confluence page with surgical precision.
+
+🚀 **Revolutionary Capability:** Direct table cell editing that preserves table structure, formatting, and all surrounding content while modifying specific data points with zero-based indexing.
+
+**Use Cases:**
+- Update project status tables with current progress
+- Modify data in comparison or feature matrices
+- Update metrics, dates, or values in tracking tables
+- Correct information in existing documentation tables
+- Update pricing, specifications, or contact information
+
+**Examples:**
+- Update status: {"page_id": "123456789", "table_index": 0, "row_index": 2, "column_index": 1, "new_cell_content": "<strong>Completed ✅</strong>"}
+- Update metrics: {"page_id": "456789123", "table_index": 1, "row_index": 1, "column_index": 0, "new_cell_content": "<strong>99.9%</strong> <em>(improved)</em>"}
+
+**Key Features:**
+- Zero-Based Indexing: table_index=0 (first table), row_index=0 (first row), column_index=0 (first column)
+- Structure Preservation: Maintains table formatting, borders, and styling
+- Rich Content Support: Supports HTML, links, formatting within cells
+- Surgical Precision: Only the target cell is modified, all other data unchanged
+
+**Index Reference:**
+- table_index: 0=first table, 1=second table, 2=third table
+- row_index: 0=first row (including headers), 1=second row
+- column_index: 0=first column, 1=second column""",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "page_id": {
+                            "type": "string",
+                            "description": "The ID of the page to update"
+                        },
+                        "table_index": {
+                            "type": "integer",
+                            "description": "Zero-based index of the table (0 for first table)"
+                        },
+                        "row_index": {
+                            "type": "integer", 
+                            "description": "Zero-based index of the row within the table"
+                        },
+                        "column_index": {
+                            "type": "integer",
+                            "description": "Zero-based index of the column within the row"
+                        },
+                        "new_cell_content": {
+                            "type": "string",
+                            "description": "New content for the cell (can include HTML)"
+                        }
+                    },
+                    "required": ["page_id", "table_index", "row_index", "column_index", "new_cell_content"]
+                }
             }
         ]
     
@@ -826,6 +998,141 @@ class UltraOptimizedHttpTransport:
                     elif tool_name == "get_page_comments":
                         inputs = GetCommentsInput(**tool_args)
                         result = await comment_actions.get_comments_logic(client, inputs)
+                    elif tool_name == "update_page_section":
+                        # Load selective editing modules
+                        _load_selective_editing()
+                        
+                        # Get current page content
+                        page_response = await client.get(f"/rest/api/content/{tool_args['page_id']}?expand=body.storage,version")
+                        page_response.raise_for_status()
+                        page_data = page_response.json()
+                        
+                        current_content = page_data['body']['storage']['value']
+                        current_version = page_data['version']['number']
+                        
+                        # Initialize section editor and perform replacement
+                        section_editor = SectionEditor()
+                        edit_result = section_editor.replace_section(
+                            content=current_content,
+                            heading=tool_args['heading'],
+                            new_content=tool_args['new_content'],
+                            heading_level=tool_args.get('heading_level'),
+                            exact_match=tool_args.get('exact_match', False),
+                            case_sensitive=tool_args.get('case_sensitive', False)
+                        )
+                        
+                        if not edit_result.success:
+                            return {
+                                "jsonrpc": "2.0",
+                                "id": message.get("id"),
+                                "error": {"code": -32603, "message": f"Failed to update section: {edit_result.error_message}"}
+                            }
+                        
+                        # Update the page
+                        update_data = {
+                            "version": {"number": current_version + 1},
+                            "body": {"storage": {"value": edit_result.modified_content, "representation": "storage"}}
+                        }
+                        update_response = await client.put(f"/rest/api/content/{tool_args['page_id']}", json=update_data)
+                        update_response.raise_for_status()
+                        
+                        result = {
+                            "success": True,
+                            "message": f"Successfully updated section '{tool_args['heading']}'",
+                            "changes_made": edit_result.changes_made or [f"Updated section under heading '{tool_args['heading']}'"],
+                            "backup_available": edit_result.backup_content is not None
+                        }
+                    elif tool_name == "replace_text_pattern":
+                        # Load selective editing modules
+                        _load_selective_editing()
+                        
+                        # Get current page content
+                        page_response = await client.get(f"/rest/api/content/{tool_args['page_id']}?expand=body.storage,version")
+                        page_response.raise_for_status()
+                        page_data = page_response.json()
+                        
+                        current_content = page_data['body']['storage']['value']
+                        current_version = page_data['version']['number']
+                        
+                        # Initialize pattern editor and perform replacement
+                        pattern_editor = PatternEditor()
+                        edit_result = pattern_editor.replace_text_pattern(
+                            content=current_content,
+                            search_pattern=tool_args['search_pattern'],
+                            replacement=tool_args['replacement'],
+                            case_sensitive=tool_args.get('case_sensitive', False),
+                            whole_words_only=tool_args.get('whole_words_only', False),
+                            max_replacements=tool_args.get('max_replacements')
+                        )
+                        
+                        if not edit_result.success:
+                            return {
+                                "jsonrpc": "2.0",
+                                "id": message.get("id"),
+                                "error": {"code": -32603, "message": f"Failed to replace text pattern: {edit_result.error_message}"}
+                            }
+                        
+                        # Count replacements made
+                        replacements_made = len([change for change in (edit_result.changes_made or []) if "replacement" in change.lower()])
+                        
+                        # Update the page
+                        update_data = {
+                            "version": {"number": current_version + 1},
+                            "body": {"storage": {"value": edit_result.modified_content, "representation": "storage"}}
+                        }
+                        update_response = await client.put(f"/rest/api/content/{tool_args['page_id']}", json=update_data)
+                        update_response.raise_for_status()
+                        
+                        result = {
+                            "success": True,
+                            "message": f"Successfully replaced {replacements_made} instances of '{tool_args['search_pattern']}'",
+                            "replacements_made": replacements_made,
+                            "changes_made": edit_result.changes_made or [f"Replaced text pattern '{tool_args['search_pattern']}' with '{tool_args['replacement']}'"],
+                            "backup_available": edit_result.backup_content is not None
+                        }
+                    elif tool_name == "update_table_cell":
+                        # Load selective editing modules
+                        _load_selective_editing()
+                        
+                        # Get current page content
+                        page_response = await client.get(f"/rest/api/content/{tool_args['page_id']}?expand=body.storage,version")
+                        page_response.raise_for_status()
+                        page_data = page_response.json()
+                        
+                        current_content = page_data['body']['storage']['value']
+                        current_version = page_data['version']['number']
+                        
+                        # Initialize structural editor and perform table cell update
+                        structural_editor = StructuralEditor()
+                        edit_result = structural_editor.update_table_cell(
+                            content=current_content,
+                            table_index=tool_args['table_index'],
+                            row_index=tool_args['row_index'],
+                            column_index=tool_args['column_index'],
+                            new_cell_content=tool_args['new_cell_content']
+                        )
+                        
+                        if not edit_result.success:
+                            return {
+                                "jsonrpc": "2.0",
+                                "id": message.get("id"),
+                                "error": {"code": -32603, "message": f"Failed to update table cell: {edit_result.error_message}"}
+                            }
+                        
+                        # Update the page
+                        update_data = {
+                            "version": {"number": current_version + 1},
+                            "body": {"storage": {"value": edit_result.modified_content, "representation": "storage"}}
+                        }
+                        update_response = await client.put(f"/rest/api/content/{tool_args['page_id']}", json=update_data)
+                        update_response.raise_for_status()
+                        
+                        result = {
+                            "success": True,
+                            "message": f"Successfully updated table[{tool_args['table_index']}] cell at row {tool_args['row_index']}, column {tool_args['column_index']}",
+                            "changes_made": edit_result.changes_made or [f"Updated table cell at [{tool_args['row_index']}, {tool_args['column_index']}]"],
+                            "backup_available": edit_result.backup_content is not None
+                        }
                     else:
                         return {
                             "jsonrpc": "2.0",

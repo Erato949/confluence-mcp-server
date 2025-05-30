@@ -3,6 +3,9 @@ name: confluence-mcp-server
 runtime: python
 build_command: pip install -e .
 start_command: python -m confluence_mcp_server.server_http_optimized
+# ✨ NEW: v2.0 with 13 tools including 3 revolutionary selective editing tools:
+# - Standard tools (10): get/search/create/update/delete pages, spaces, attachments, comments
+# - Selective editing (3): update_page_section, replace_text_pattern, update_table_cell
 environment_variables:
   # SECURITY: These are DEBUG PLACEHOLDERS ONLY - Real values come from Smithery UI
   # If you see these values in logs, it means Smithery UI config is NOT being applied

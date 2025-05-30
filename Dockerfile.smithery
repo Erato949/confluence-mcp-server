@@ -1,23 +1,23 @@
 FROM python:3.11-slim
 
-# Install dependencies for maximum efficiency
-RUN pip install --no-cache-dir starlette uvicorn python-multipart
+# Install dependencies including packages needed for selective editing
+RUN pip install --no-cache-dir fastapi uvicorn python-multipart httpx python-dotenv pydantic
 
 WORKDIR /app
 
-# Copy server code
+# Copy entire confluence_mcp_server module to ensure all selective editing components are included
 COPY confluence_mcp_server/ ./confluence_mcp_server/
 
-# Create a simple startup script that ensures PORT is read correctly
-RUN echo '#!/bin/bash\nexec python -m confluence_mcp_server.server_starlette_minimal "$@"' > /app/start.sh && \
+# Create a simple startup script that ensures PORT is read correctly  
+RUN echo '#!/bin/bash\nexec python -m confluence_mcp_server.server_http_optimized "$@"' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Smithery will set PORT environment variable
 EXPOSE 8000
 
-# Health check for container readiness
+# Health check for container readiness using updated server
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:' + __import__('os').environ.get('PORT', '8000') + '/health')"
 
-# Start the optimized server
-CMD ["python", "-m", "confluence_mcp_server.server_starlette_minimal"] 
+# Start the optimized server with all 13 tools (10 standard + 3 selective editing)
+CMD ["python", "-m", "confluence_mcp_server.server_http_optimized"] 
