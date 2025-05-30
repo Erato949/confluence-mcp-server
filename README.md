@@ -1,33 +1,113 @@
-# Confluence MCP Server
+# Confluence MCP Server v2.0 🚀 Revolutionary Selective Editing
 
-![Release](https://img.shields.io/badge/release-v1.1.0-green.svg) ![Status](https://img.shields.io/badge/status-production--ready-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Platform](https://img.shields.io/badge/platform-universal-blue.svg)
+![Release](https://img.shields.io/badge/release-v2.0.0-gold.svg) ![Status](https://img.shields.io/badge/status-revolutionary-brightgreen.svg) ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Platform](https://img.shields.io/badge/platform-universal-blue.svg)
 
-A **universal, production-ready MCP (Model Context Protocol) server** for Confluence integration. Built with FastMCP, this server provides AI assistants like Claude with direct access to Confluence Cloud functionality through multiple transport protocols and deployment options.
+🎉 **INTRODUCING v2.0: Industry's First XML-Aware Selective Editing System for AI Assistants**
+
+A **revolutionary MCP (Model Context Protocol) server** that transforms how AI assistants interact with Confluence. Beyond basic page management, v2.0 introduces **surgical precision editing** that allows AI to make targeted modifications while preserving all existing content, formatting, and macros.
+
+## ✨ What Makes v2.0 Revolutionary
+
+### 🎯 **Surgical Precision Editing**
+Unlike traditional "replace entire page" approaches, v2.0 enables:
+- **Section Updates**: Modify specific sections under headings without touching other content
+- **Pattern Replacement**: Find and replace text while preserving XML structure and macros
+- **Table Cell Editing**: Update individual table cells without affecting table structure
+- **Structure Preservation**: Maintains all formatting, layouts, macros, and custom elements
+
+### 🧠 **XML-Aware Intelligence**
+- **Confluence Storage Format Expert**: Understands and preserves Confluence's complex XML structure
+- **Macro Safety**: Never breaks macros, layouts, or custom elements during edits
+- **Content Analysis**: Intelligently identifies safe editing locations and content boundaries
+- **Rollback Capability**: Automatic backup creation for safe editing operations
+
+### 🛠️ **13 Powerful Tools**
+**Standard Tools (10)**: Complete page, space, attachment, and comment management
+**🆕 Selective Editing Tools (3)**: Revolutionary precision editing capabilities
+
+## 🚀 Revolutionary Selective Editing Tools
+
+### 1. `update_page_section` - Surgical Section Replacement
+Updates specific sections under headings without affecting surrounding content.
+
+**Example**: Update project status without touching meeting notes
+```
+AI: "Update the 'Project Status' section to show completed milestones"
+✅ Updates only that section, preserves all other content
+```
+
+**Features**:
+- Intelligent heading detection (H1-H6) with hierarchy support
+- Flexible matching: case-sensitive, exact match, or fuzzy search
+- Nested heading support for complex document structures
+- Preserves all macros, layouts, and formatting outside target section
+
+### 2. `replace_text_pattern` - XML-Aware Find & Replace
+Replaces text patterns throughout pages while preserving document structure.
+
+**Example**: Update product version across documentation
+```
+AI: "Replace all instances of 'v1.2.3' with 'v2.0.0' in the API docs"
+✅ Updates version numbers while preserving links, macros, and formatting
+```
+
+**Features**:
+- Smart content detection distinguishes text from XML markup
+- Case sensitivity and whole-word matching options
+- Replacement limits for controlled changes
+- Never breaks macros, links, or formatting elements
+
+### 3. `update_table_cell` - Precision Table Editing
+Updates specific table cells while maintaining table structure and formatting.
+
+**Example**: Update project metrics in status tables
+```
+AI: "Update the completion percentage in row 2, column 3 to 95%"
+✅ Changes only that cell, preserves table formatting and other data
+```
+
+**Features**:
+- Zero-based indexing for precise cell targeting
+- Rich HTML content support within cells
+- Table structure preservation (borders, styling, headers)
+- Surgical precision - only target cell is modified
 
 ## 🌐 Universal Deployment Platform
 
-**NEW in v1.1.0**: Multi-platform support with HTTP transport alongside the original stdio transport.
-
 ### 🚀 Deployment Options
 
-| Platform | Transport | Status | Use Case |
-|----------|-----------|--------|----------|
-| **Claude Desktop** | stdio | ✅ 100% Compatible | Local development, personal use |
-| **Smithery.ai** | HTTP | 🔧 Optimized | Cloud deployment, team sharing (optimized server) |
-| **Docker** | HTTP/stdio | ✅ Production Ready | Containerized deployment |
-| **Web Clients** | HTTP | ✅ Production Ready | Browser-based AI tools |
-| **Cloud Platforms** | HTTP | ✅ Production Ready | Railway, Heroku, AWS, etc. |
+| Platform | Transport | Status | Tools Available |
+|----------|-----------|--------|-----------------|
+| **Claude Desktop** | stdio | ✅ All 13 Tools | Local development, personal use |
+| **Smithery.ai** | HTTP | ✅ All 13 Tools | Cloud deployment, team sharing |
+| **Docker** | HTTP/stdio | ✅ All 13 Tools | Containerized deployment |
+| **Web Clients** | HTTP | ✅ All 13 Tools | Browser-based AI tools |
+| **Cloud Platforms** | HTTP | ✅ All 13 Tools | Railway, Heroku, AWS, etc. |
 
-## ✨ Features
+## 🛠️ Complete Tool Suite
 
-- **Complete Page Management**: Create, read, update, delete Confluence pages
-- **Advanced Search**: Search pages with CQL (Confluence Query Language) support
-- **Space Management**: List and explore Confluence spaces with permissions
-- **Attachment Handling**: Upload, download, and manage page attachments
-- **Comment System**: Access and manage page comments and discussions
-- **Multi-Transport**: stdio (Claude Desktop) + HTTP (web/cloud platforms)
-- **Universal Launcher**: Auto-detects best transport mode for your environment
-- **Production Ready**: Comprehensive error handling, logging, and monitoring
+### 📄 **Standard Confluence Tools (10)**
+
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `get_confluence_page` | Retrieve page content | "Show me the content of page ID 123456" |
+| `create_confluence_page` | Create new pages | "Create a meeting notes page in the PROJ space" |
+| `update_confluence_page` | Modify entire pages | "Replace all content in page 123456" |
+| `delete_confluence_page` | Remove pages | "Delete the outdated page 123456" |
+| `search_confluence_pages` | Search with CQL | "Find all pages in PROJ space modified this week" |
+| `get_confluence_spaces` | List available spaces | "What spaces do I have access to?" |
+| `get_page_attachments` | View page attachments | "Show attachments on page 123456" |
+| `add_page_attachment` | Upload files | "Upload this document to page 123456" |
+| `delete_page_attachment` | Remove files | "Delete the old attachment from page 123456" |
+| `get_page_comments` | Read page comments | "Show me comments on page 123456" |
+
+### 🎯 **Revolutionary Selective Editing Tools (3)**
+
+| Tool | Description | Revolutionary Capability |
+|------|-------------|--------------------------|
+| `update_page_section` | Surgical section replacement | Updates specific headings without touching other sections |
+| `replace_text_pattern` | XML-aware pattern replacement | Replaces text while preserving macros and formatting |
+| `update_table_cell` | Precision table cell editing | Modifies individual cells without affecting table structure |
 
 ## 🚀 Quick Start
 
@@ -55,9 +135,9 @@ A **universal, production-ready MCP (Model Context Protocol) server** for Conflu
    }
    ```
 
-3. **Restart Claude Desktop** and look for the 🔨 hammer icon
+3. **Restart Claude Desktop** and look for the 🔨 hammer icon showing **13 tools**
 
-### Option 2: HTTP Server (new in v1.1.0)
+### Option 2: HTTP Server
 
 1. **Install Dependencies**:
    ```bash
@@ -73,20 +153,20 @@ A **universal, production-ready MCP (Model Context Protocol) server** for Conflu
 
 3. **Start HTTP Server**:
    ```bash
-   python -m confluence_mcp_server.server_http
+   python -m confluence_mcp_server.server_http_optimized
    ```
 
 4. **Test the Server**:
    ```bash
-   curl http://localhost:8000/health
-   # Returns: {"status": "healthy", "transport": "http"}
+   curl http://localhost:8000/mcp
+   # Returns: 13 tools including selective editing capabilities
    ```
 
-### Option 3: Docker Deployment (new in v1.1.0)
+### Option 3: Docker Deployment
 
 1. **Build Container**:
    ```bash
-   docker build -t confluence-mcp-server .
+   docker build -f Dockerfile.smithery -t confluence-mcp-server-v2 .
    ```
 
 2. **Run Container**:
@@ -95,154 +175,73 @@ A **universal, production-ready MCP (Model Context Protocol) server** for Conflu
      -e CONFLUENCE_URL="https://your-org.atlassian.net" \
      -e CONFLUENCE_USERNAME="your-email@domain.com" \
      -e CONFLUENCE_API_TOKEN="your-api-token" \
-     confluence-mcp-server
+     confluence-mcp-server-v2
    ```
 
-### Option 4: Universal Launcher (new in v1.1.0)
-
-The universal launcher automatically detects the best transport mode:
-
-```bash
-# Auto-detect transport mode
-python -m confluence_mcp_server.launcher
-
-# Force specific mode
-python -m confluence_mcp_server.launcher --http --port 9000
-python -m confluence_mcp_server.launcher --stdio
-```
-
-### Option 5: Smithery.ai Deployment (new in v1.1.0)
+### Option 4: Smithery.ai Deployment
 
 1. **Upload Files**: Upload `smithery.yaml` and server code to Smithery.ai
 2. **Configure Credentials**: Set Confluence URL, username, and API token
-3. **Deploy**: Smithery.ai handles the rest automatically
+3. **Deploy**: Smithery.ai automatically provides all 13 tools including selective editing
 
-## 🛠️ Available Tools
+## 💬 Revolutionary AI Assistant Workflows
 
-All 10 Confluence tools work across **all transport modes** (stdio and HTTP):
+### 🎯 **Selective Editing Examples**
 
-| Tool | Description | Example Usage |
-|------|-------------|---------------|
-| `get_confluence_page` | Retrieve page content | "Show me the content of page ID 123456" |
-| `create_confluence_page` | Create new pages | "Create a meeting notes page in the PROJ space" |
-| `update_confluence_page` | Modify existing pages | "Add a new section to page 123456" |
-| `delete_confluence_page` | Remove pages | "Delete the outdated page 123456" |
-| `search_confluence_pages` | Search with CQL | "Find all pages in PROJ space modified this week" |
-| `get_confluence_spaces` | List available spaces | "What spaces do I have access to?" |
-| `get_page_attachments` | View page attachments | "Show attachments on page 123456" |
-| `add_page_attachment` | Upload files | "Upload this document to page 123456" |
-| `delete_page_attachment` | Remove files | "Delete the old attachment from page 123456" |
-| `get_page_comments` | Read page comments | "Show me comments on page 123456" |
+**Update Project Status Without Disrupting Meeting Notes**:
+```
+You: Update the project status section to show we completed the API development milestone
 
-## 🔄 Calling Convention Compatibility
-
-**NEW in v1.1.0**: Support for both old and new FastMCP calling conventions for maximum compatibility.
-
-### Supported Calling Formats
-
-This server supports **both** calling conventions to ensure compatibility with different MCP clients:
-
-#### Legacy Format (FastMCP v0.x)
-```json
-{
-  "inputs": {
-    "page_id": "123456",
-    "expand": "body.view"
-  }
-}
+AI: I'll update just the project status section while preserving all your meeting notes...
+[Uses update_page_section tool]
+✅ Updated "Project Status" section only - meeting notes, action items, and formatting preserved
 ```
 
-#### Modern Format (FastMCP v1.x+)
-```json
-{
-  "page_id": "123456", 
-  "expand": "body.view"
-}
+**Fix Typos Across Documentation**:
+```
+You: Fix the typo "recieve" to "receive" throughout our API documentation pages
+
+AI: I'll find and fix that typo while preserving all links and formatting...
+[Uses replace_text_pattern tool]  
+✅ Fixed 12 instances across 5 pages - all macros, links, and formatting preserved
 ```
 
-### Backward Compatibility
+**Update Metrics in Status Dashboard**:
+```
+You: Update the completion percentage in our project dashboard table to 85%
 
-- **✅ Zero Breaking Changes**: All existing integrations continue working unchanged
-- **✅ Automatic Detection**: Server handles both formats transparently  
-- **✅ Same Functionality**: Identical behavior regardless of calling convention
-- **✅ Error Handling**: Consistent validation and error messages for both formats
-
-### Implementation Details
-
-The server uses a **wrapper function architecture** that maintains compatibility:
-
-- **Direct Parameter Tools**: Handle modern format with individual parameters
-- **Legacy Schema Tools**: Support legacy format with `inputs` wrapper
-- **Shared Logic**: Both conventions use the same underlying implementation
-- **Schema Validation**: Pydantic validation preserved for both formats
-
-This approach ensures maximum compatibility while maintaining clean, maintainable code.
-
-## 🌐 HTTP API Endpoints (v1.1.0)
-
-The HTTP transport provides these endpoints for web integration:
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Server information and tool count |
-| `/health` | GET | Health check and status |
-| `/mcp` | GET | List available tools (lazy loading) |
-| `/mcp` | POST | Execute tools via JSON-RPC 2.0 |
-| `/mcp` | DELETE | Session cleanup |
-
-### Example HTTP Usage
-
-```bash
-# List available tools
-curl http://localhost:8000/mcp
-
-# Execute a tool via JSON-RPC
-curl -X POST http://localhost:8000/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/call",
-    "params": {
-      "name": "get_confluence_spaces",
-      "arguments": {"limit": 10}
-    }
-  }'
+AI: I'll update that specific table cell without affecting the rest of the dashboard...
+[Uses update_table_cell tool]
+✅ Updated table cell [2,3] to "85%" - table structure and other metrics preserved
 ```
 
-## 💬 Example AI Assistant Conversations
-
-**Creating a Page** (works on all platforms):
+### 📄 **Traditional Page Management**:
 ```
-You: Create a new project kickoff page in the ENGINEERING space with a basic template
+You: Create a new project kickoff page in the ENGINEERING space
 
-AI: I'll create a project kickoff page for you in the ENGINEERING space...
+AI: I'll create a project kickoff page for you...
 [Uses create_confluence_page tool]
 ✅ Created "Project Kickoff" page (ID: 789123) in ENGINEERING space
 ```
 
-**Searching Content**:
-```
-You: Find all pages mentioning "API documentation" that were updated this month
+## 🔧 Advanced Configuration
 
-AI: I'll search for pages with "API documentation" updated recently...
-[Uses search_confluence_pages tool]
-📄 Found 5 pages matching your criteria...
-```
+### v2.0 Selective Editing Features
+The selective editing system provides several advanced options:
 
-## 🔧 Configuration Options
+#### Content Analysis Engine
+- **Heading Hierarchy Detection**: Automatically identifies H1-H6 structure
+- **Section Boundary Analysis**: Precisely identifies content boundaries
+- **Macro Detection**: Recognizes and preserves Confluence macros
+- **Table Structure Analysis**: Understands complex table layouts
 
-### Platform Compatibility Notes
+#### Safety Features
+- **Backup Creation**: Automatic content backup before modifications
+- **Rollback Capability**: Restore original content if needed
+- **Validation Engine**: Ensures modifications won't break page structure
+- **Error Recovery**: Graceful handling of complex XML scenarios
 
-**Cursor**: Requires installation path with **no spaces**. Your current path `C:/Users/chris/Documents/Confluence-MCP-Server_Claude` is compatible.
-
-**Windsurf**: Full MCP support with both stdio and HTTP transports.
-
-**Smithery.ai**: Uses HTTP transport with automatic configuration management.
-
-**Claude Desktop**: Uses stdio transport with manual configuration.
-
-### Environment Variables (all platforms)
+### Environment Variables
 ```bash
 CONFLUENCE_URL=https://your-org.atlassian.net
 CONFLUENCE_USERNAME=your-email@domain.com
@@ -257,169 +256,127 @@ CONFLUENCE_USERNAME=your-email@domain.com
 CONFLUENCE_API_TOKEN=your-api-token
 ```
 
-### Smithery.ai Configuration
-The server automatically handles base64-encoded configuration from Smithery.ai platform.
-
 ## 🔒 Security & Authentication
 
 - **API Tokens**: Secure token-based authentication with Confluence
 - **HTTPS Only**: All API requests use encrypted connections
 - **Permission Inheritance**: Server inherits your Confluence user permissions
 - **No Data Storage**: Direct API passthrough, no local data retention
-- **Container Security**: Non-root user, minimal attack surface
-
-### Getting Confluence API Token
-
-1. Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
-2. Click "Create API Token"
-3. Copy the generated token
-4. Use your email address as the username
+- **Selective Editing Security**: Automatic backup creation prevents data loss
 
 ## 🧪 Testing & Validation
 
-### Run Test Suite
+### Run Complete Test Suite
 ```bash
-# Run all tests
+# Run all 217 tests (214 selective editing + 3 MCP integration)
 python -m pytest tests/ -v
 
-# Test HTTP transport specifically
-python -m pytest tests/test_http_transport.py -v
+# Test selective editing specifically
+python -m pytest tests/test_section_editor.py -v
+python -m pytest tests/test_pattern_editor.py -v
+python -m pytest tests/test_structural_editor.py -v
 
-# Test specific functionality
-python -m pytest tests/ -k "test_get_page"
-```
-
-### Validate Dependencies
-```bash
+# Validate v2.0 functionality
 python -c "
-import fastmcp, fastapi, uvicorn, pytest_asyncio;
-print('✅ All dependencies working correctly')
+from confluence_mcp_server.selective_editing import SectionEditor, PatternEditor, StructuralEditor;
+print('✅ v2.0 selective editing modules loaded successfully')
 "
 ```
 
 ### Health Checks
 ```bash
-# stdio transport (Claude Desktop)
-python -c "import confluence_mcp_server.main; print('✅ stdio transport ready')"
-
-# HTTP transport
-python -m confluence_mcp_server.server_http &
-curl http://localhost:8000/health
+# HTTP transport with selective editing
+python -m confluence_mcp_server.server_http_optimized &
+curl http://localhost:8000/mcp
+# Should show 13 tools including selective editing
 ```
 
-## 🔄 Migration from v1.0.x
+## 🔄 Migration from v1.x
 
-**100% Backward Compatible** - no changes needed for existing Claude Desktop setups.
+**100% Backward Compatible** - all existing tools continue working unchanged.
 
-New capabilities in v1.1.0:
-- ✅ HTTP transport for web/cloud deployment
-- ✅ Docker containerization
-- ✅ Smithery.ai integration
-- ✅ Universal launcher
-- ✅ Enhanced configuration management
-- ✅ Production monitoring and health checks
+### What's New in v2.0:
+- ✅ **3 Revolutionary Selective Editing Tools**: `update_page_section`, `replace_text_pattern`, `update_table_cell`
+- ✅ **XML-Aware Content Analysis**: Deep understanding of Confluence storage format
+- ✅ **Structure Preservation**: Maintains all formatting, macros, and layouts
+- ✅ **Backup & Rollback**: Automatic content backup for safe editing
+- ✅ **Enhanced HTTP Servers**: All servers now include selective editing capabilities
+- ✅ **217 Comprehensive Tests**: Extensive test coverage for all functionality
+
+### Upgrading from v1.x:
+1. **No changes needed** for existing configurations
+2. **New tools automatically available** in all deployments
+3. **Enhanced capabilities** without breaking changes
+4. **Performance improvements** with lazy loading architecture
 
 ## 🐛 Troubleshooting
 
-### Claude Desktop Issues
-- **No hammer icon**: Check config file syntax and restart Claude Desktop
+### v2.0 Selective Editing Issues
+- **Tool not found**: Verify deployment includes updated server files
+- **Section not found**: Check heading text and level parameters
+- **XML parsing errors**: Selective editing includes fallback mechanisms
+- **Backup not created**: Check page permissions and storage space
+
+### General Issues
 - **Authentication fails**: Verify API token and Confluence URL
-- **Tools fail**: Check environment variables and network connectivity
-
-### Cursor Issues
-- **"No tools found"**: Ensure installation path contains **no spaces**
-  - ❌ `node C:/my projects/mcpserver/build/index.js` (fails due to space)
-  - ✅ `node C:/projects/mcpserver/build/index.js` (works)
-- **Windows paths**: Use forward slashes or properly escaped backslashes
-- **Test manually first**: Verify server starts without errors before adding to Cursor
-- **Check task manager**: Look for briefly appearing node processes during refresh
-
-### HTTP Server Issues
-- **Port conflicts**: Use `--port` flag to specify different port
-- **CORS errors**: Server includes CORS middleware for web clients
-- **Tool execution fails**: Check environment variables and Confluence permissions
-
-### Docker Issues
-- **Container won't start**: Check environment variables are properly set
-- **Health check fails**: Verify Confluence connectivity from container
-- **Permission errors**: Container runs as non-root user by default
-
-### General Debugging
-```bash
-# Enable debug logging
-export LOG_LEVEL=DEBUG
-python -m confluence_mcp_server.launcher
-
-# Test Confluence connectivity
-curl -u email:token https://your-org.atlassian.net/rest/api/space
-```
+- **Tools not showing**: Ensure all 13 tools are registered (check tool count)
+- **Performance issues**: Selective editing uses lazy loading for optimal performance
 
 ## 📦 Production Deployment
 
-### Cloud Platforms
+### Cloud Platforms with v2.0
+All cloud platforms now support the complete selective editing suite:
 
-**Railway**:
-```bash
-# Deploy directly from GitHub
-railway login
-railway link
-railway up
-```
+**Smithery.ai** (Recommended):
+- Automatic configuration management
+- All 13 tools available immediately
+- Optimized for fast tool discovery
+- Revolutionary selective editing ready
 
-**Heroku**:
-```bash
-# Use included Dockerfile
-heroku container:push web
-heroku container:release web
-```
-
-**AWS/GCP/Azure**:
-- Use Docker image for container services
+**Railway/Heroku/AWS**:
+- Use updated `Dockerfile.smithery` for v2.0 capabilities
 - Set environment variables in platform configuration
-- Use health check endpoint `/health` for monitoring
+- Health check endpoint shows tool count for verification
 
-### Monitoring
+## 🎯 v2.0 Use Cases
 
-The HTTP server provides monitoring endpoints:
-- **Health**: `GET /health` - Server status
-- **Metrics**: `GET /` - Tool count and server info
-- **Logs**: Structured logging for debugging and monitoring
+### Content Management Revolution
+- **Living Documentation**: Update specific sections as projects evolve
+- **Version Management**: Update version numbers across multiple pages instantly
+- **Status Dashboards**: Update metrics without affecting layout or other data
+- **Collaborative Editing**: Make targeted edits without disrupting team workflows
+
+### Enterprise Scenarios
+- **API Documentation**: Update endpoints while preserving examples and troubleshooting
+- **Project Tracking**: Update status reports while maintaining historical context
+- **Knowledge Base**: Fix typos and update information while preserving formatting
+- **Compliance Documentation**: Update policies while maintaining approval workflows
 
 ## 🤝 Development
 
-### Project Structure
+### v2.0 Architecture
 ```
 confluence_mcp_server/
-├── main.py                 # stdio transport (Claude Desktop)
-├── server_http.py          # HTTP transport (web/cloud)
-├── launcher.py             # Universal launcher
-├── mcp_actions/           # Tool implementations
-│   ├── page_actions.py    # Page management
-│   ├── space_actions.py   # Space operations
-│   ├── attachment_actions.py # File handling
-│   ├── comment_actions.py # Comments
-│   └── schemas.py         # Data models
-└── utils/
-    └── logging_config.py  # Logging setup
+├── main.py                    # stdio transport with all 13 tools
+├── server_http_optimized.py   # HTTP transport with all 13 tools
+├── selective_editing/         # 🆕 Revolutionary editing engine
+│   ├── section_editor.py     # Section-based operations
+│   ├── pattern_editor.py     # Pattern replacement operations  
+│   ├── structural_editor.py  # Table and list operations
+│   ├── content_analyzer.py   # XML content analysis
+│   ├── xml_parser.py         # Confluence XML parser
+│   └── operations.py         # Operation definitions
+├── mcp_actions/              # Standard tool implementations
+└── tests/                    # 217 comprehensive tests
 
-tests/                     # Comprehensive test suite
-├── test_http_transport.py # HTTP transport tests
-└── test_*.py             # Tool-specific tests
-
-Dockerfile                 # Container configuration
-smithery.yaml             # Smithery.ai deployment
-pyproject.toml            # Package configuration
-requirements.txt          # Dependencies
+Phase Documentation:
+├── Phase-1-Foundation.md     # XML parsing and operations
+├── Phase-2-ContentAnalysis.md # Content structure analysis  
+├── Phase-3-SectionOps.md     # Section-based editing
+├── Phase-4-PatternOps.md     # Pattern operations
+├── Phase-5-StructuralOps.md  # Table and list editing
+└── Phase-6-MCPIntegration.md # MCP tool integration
 ```
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass (`pytest tests/ -v`)
-5. Test both stdio and HTTP transports
-6. Submit a pull request
 
 ## 📄 License
 
@@ -427,13 +384,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🚀 Ready to Get Started?
+## 🚀 Experience the Future of Confluence AI Integration
 
-Choose your deployment option:
+### Choose Your Adventure:
 
-- **🖥️ Claude Desktop**: Use the stdio transport for local development
-- **🌐 Web/Cloud**: Use the HTTP transport for scalable deployment  
-- **🐳 Docker**: Use containers for consistent deployment
-- **⚡ Smithery.ai**: Use cloud platform for instant deployment
+- **🎯 Precision Editing**: Use selective editing tools for surgical modifications
+- **📄 Complete Management**: Use standard tools for full page operations  
+- **🌐 Universal Access**: Deploy anywhere with HTTP transport
+- **🖥️ Local Development**: Use Claude Desktop for immediate access
 
-**Transform your Confluence workflow with AI assistance today!** 🎉
+**Transform your Confluence workflow with revolutionary AI-assisted editing!** 🎉
+
+### Ready to Get Started?
+
+1. **Developers**: Try selective editing in Claude Desktop
+2. **Teams**: Deploy on Smithery.ai for instant access
+3. **Enterprise**: Use Docker deployment for production environments
+
+**Welcome to the future of AI-assisted content management!** ✨
