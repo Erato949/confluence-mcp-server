@@ -12,7 +12,7 @@ import logging
 import sys
 import base64
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Third-Party Imports
 from dotenv import load_dotenv
@@ -43,6 +43,13 @@ try:
         # Comment Schemas
         GetCommentsInput, GetCommentsOutput
     )
+    # Selective Editing System Imports
+    from confluence_mcp_server.selective_editing.section_editor import SectionEditor
+    from confluence_mcp_server.selective_editing.pattern_editor import PatternEditor
+    from confluence_mcp_server.selective_editing.structural_editor import StructuralEditor
+    from confluence_mcp_server.selective_editing.xml_parser import ConfluenceXMLParser
+    from confluence_mcp_server.selective_editing.content_analyzer import ContentStructureAnalyzer
+    from confluence_mcp_server.selective_editing.operations import OperationType
 except ImportError as e:
     # Fail silently - don't write to stderr as it can interfere with MCP protocol
     pass
@@ -1146,6 +1153,402 @@ async def get_page_comments_direct(
         logger.error(f"Error in get_page_comments_direct: {str(e)}")
         raise ToolError(f"Failed to get comments: {str(e)}")
 
+# --- SELECTIVE EDITING TOOL SCHEMAS ---
+
+class UpdatePageSectionInput(BaseModel):
+    """Input schema for updating a specific section of a Confluence page."""
+    page_id: str = Field(description="The ID of the page to update")
+    heading: str = Field(description="The heading text to find (case-insensitive by default)")
+    new_content: str = Field(description="New content to replace the section with (Confluence storage format)")
+    heading_level: Optional[int] = Field(None, description="Specific heading level to match (1-6)")
+    exact_match: bool = Field(False, description="Whether to require exact heading text match")
+    case_sensitive: bool = Field(False, description="Whether heading search should be case-sensitive")
+
+class UpdatePageSectionOutput(BaseModel):
+    """Output schema for section update operation."""
+    success: bool = Field(description="Whether the operation was successful")
+    message: str = Field(description="Status message describing the result")
+    changes_made: List[str] = Field(description="List of changes that were made")
+    page_url: Optional[str] = Field(None, description="URL to view the updated page")
+    backup_available: bool = Field(description="Whether backup content is available for rollback")
+
+class ReplaceTextPatternInput(BaseModel):
+    """Input schema for replacing text patterns in a Confluence page."""
+    page_id: str = Field(description="The ID of the page to update")
+    search_pattern: str = Field(description="Text pattern to search for")
+    replacement: str = Field(description="Text to replace matches with")
+    case_sensitive: bool = Field(False, description="Whether search should be case-sensitive")
+    whole_words_only: bool = Field(False, description="Whether to match whole words only")
+    max_replacements: Optional[int] = Field(None, description="Maximum number of replacements to make")
+
+class ReplaceTextPatternOutput(BaseModel):
+    """Output schema for text pattern replacement operation."""
+    success: bool = Field(description="Whether the operation was successful")
+    message: str = Field(description="Status message describing the result")
+    replacements_made: int = Field(description="Number of replacements that were made")
+    changes_made: List[str] = Field(description="List of changes that were made")
+    page_url: Optional[str] = Field(None, description="URL to view the updated page")
+    backup_available: bool = Field(description="Whether backup content is available for rollback")
+
+class UpdateTableCellInput(BaseModel):
+    """Input schema for updating a specific table cell in a Confluence page."""
+    page_id: str = Field(description="The ID of the page to update")
+    table_index: int = Field(description="Zero-based index of the table (0 for first table)")
+    row_index: int = Field(description="Zero-based index of the row within the table")
+    column_index: int = Field(description="Zero-based index of the column within the row")
+    new_cell_content: str = Field(description="New content for the cell (can include HTML)")
+
+class UpdateTableCellOutput(BaseModel):
+    """Output schema for table cell update operation."""
+    success: bool = Field(description="Whether the operation was successful")
+    message: str = Field(description="Status message describing the result")
+    changes_made: List[str] = Field(description="List of changes that were made")
+    page_url: Optional[str] = Field(None, description="URL to view the updated page")
+    backup_available: bool = Field(description="Whether backup content is available for rollback")
+
+# --- SELECTIVE EDITING TOOL FUNCTIONS ---
+
+async def update_page_section(inputs: UpdatePageSectionInput) -> UpdatePageSectionOutput:
+    """
+    Updates a specific section of a Confluence page by replacing content under a heading.
+    
+    **Revolutionary Capability:** This is part of the industry's first XML-aware selective editing system
+    that allows surgical precision modifications without affecting surrounding content.
+    
+    **Use Cases:**
+    - Update specific sections without touching other content
+    - Modify project status, meeting notes, or documentation sections
+    - Replace outdated information while preserving page structure
+    - Update content sections while maintaining macros and formatting
+    
+    **Examples:**
+    - Update status section: `{"page_id": "123456", "heading": "Project Status", "new_content": "<p>Completed</p>"}`
+    - Replace specific heading level: `{"page_id": "123456", "heading": "Overview", "heading_level": 2, "new_content": "<p>New overview</p>"}`
+    - Case-sensitive exact match: `{"page_id": "123456", "heading": "API Documentation", "exact_match": true, "case_sensitive": true, "new_content": "<p>Updated API docs</p>"}`
+    
+    **Key Features:**
+    - Preserves all other page content, macros, and layouts
+    - Intelligent section boundary detection
+    - Supports nested heading hierarchies
+    - Maintains XML structure and formatting
+    - Automatic backup for rollback capability
+    
+    **Tips:**
+    - Use heading_level to target specific heading depths
+    - Enable exact_match for precise targeting when multiple similar headings exist
+    - Content should be in Confluence storage format (HTML-like)
+    - Operation preserves all content outside the target section
+    """
+    try:
+        async with await get_confluence_client() as client:
+            # Get current page content
+            page_response = await client.get(f"/rest/api/content/{inputs.page_id}?expand=body.storage,version")
+            page_response.raise_for_status()
+            page_data = page_response.json()
+            
+            current_content = page_data['body']['storage']['value']
+            current_version = page_data['version']['number']
+            
+            # Initialize section editor
+            section_editor = SectionEditor()
+            
+            # Perform section replacement
+            result = section_editor.replace_section(
+                content=current_content,
+                heading=inputs.heading,
+                new_content=inputs.new_content,
+                heading_level=inputs.heading_level,
+                exact_match=inputs.exact_match,
+                case_sensitive=inputs.case_sensitive
+            )
+            
+            if not result.success:
+                return UpdatePageSectionOutput(
+                    success=False,
+                    message=f"Failed to update section: {result.error_message}",
+                    changes_made=[],
+                    backup_available=result.backup_content is not None
+                )
+            
+            # Update the page with modified content
+            update_data = {
+                "version": {"number": current_version + 1},
+                "body": {
+                    "storage": {
+                        "value": result.modified_content,
+                        "representation": "storage"
+                    }
+                }
+            }
+            
+            update_response = await client.put(f"/rest/api/content/{inputs.page_id}", json=update_data)
+            update_response.raise_for_status()
+            updated_page = update_response.json()
+            
+            # Generate page URL
+            base_url = os.getenv("CONFLUENCE_URL", "").rstrip('/')
+            page_url = get_page_url_from_api_response(updated_page, base_url)
+            
+            return UpdatePageSectionOutput(
+                success=True,
+                message=f"Successfully updated section '{inputs.heading}'",
+                changes_made=result.changes_made or [f"Updated section under heading '{inputs.heading}'"],
+                page_url=page_url,
+                backup_available=result.backup_content is not None
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in update_page_section: {str(e)}")
+        raise ToolError(f"Failed to update page section: {str(e)}")
+
+async def replace_text_pattern(inputs: ReplaceTextPatternInput) -> ReplaceTextPatternOutput:
+    """
+    Replaces text patterns throughout a Confluence page with intelligent content preservation.
+    
+    **Revolutionary Capability:** XML-aware pattern replacement that preserves macros, formatting,
+    and document structure while performing precise text substitutions.
+    
+    **Use Cases:**
+    - Find and replace text across entire pages
+    - Update terminology, names, or references
+    - Bulk text corrections and updates
+    - Content standardization and consistency fixes
+    
+    **Examples:**
+    - Simple replacement: `{"page_id": "123456", "search_pattern": "old term", "replacement": "new term"}`
+    - Case-sensitive: `{"page_id": "123456", "search_pattern": "API", "replacement": "Application Programming Interface", "case_sensitive": true}`
+    - Whole words only: `{"page_id": "123456", "search_pattern": "test", "replacement": "production", "whole_words_only": true}`
+    - Limited replacements: `{"page_id": "123456", "search_pattern": "TODO", "replacement": "COMPLETED", "max_replacements": 5}`
+    
+    **Key Features:**
+    - Preserves XML structure, macros, and layouts
+    - Smart content detection prevents breaking formatting
+    - Flexible matching options (case, whole words)
+    - Replacement limits for controlled changes
+    - Automatic backup for rollback capability
+    
+    **Tips:**
+    - Use whole_words_only to avoid partial word matches
+    - Set max_replacements to limit scope of changes
+    - Test with small examples first for complex patterns
+    - Operation works on rendered text while preserving XML structure
+    """
+    try:
+        async with await get_confluence_client() as client:
+            # Get current page content
+            page_response = await client.get(f"/rest/api/content/{inputs.page_id}?expand=body.storage,version")
+            page_response.raise_for_status()
+            page_data = page_response.json()
+            
+            current_content = page_data['body']['storage']['value']
+            current_version = page_data['version']['number']
+            
+            # Initialize pattern editor
+            pattern_editor = PatternEditor()
+            
+            # Perform text pattern replacement
+            result = pattern_editor.replace_text_pattern(
+                content=current_content,
+                search_pattern=inputs.search_pattern,
+                replacement=inputs.replacement,
+                case_sensitive=inputs.case_sensitive,
+                whole_words_only=inputs.whole_words_only,
+                max_replacements=inputs.max_replacements
+            )
+            
+            if not result.success:
+                return ReplaceTextPatternOutput(
+                    success=False,
+                    message=f"Failed to replace text pattern: {result.error_message}",
+                    replacements_made=0,
+                    changes_made=[],
+                    backup_available=result.backup_content is not None
+                )
+            
+            # Count replacements made
+            replacements_made = len([change for change in (result.changes_made or []) if "replacement" in change.lower()])
+            
+            # Update the page with modified content
+            update_data = {
+                "version": {"number": current_version + 1},
+                "body": {
+                    "storage": {
+                        "value": result.modified_content,
+                        "representation": "storage"
+                    }
+                }
+            }
+            
+            update_response = await client.put(f"/rest/api/content/{inputs.page_id}", json=update_data)
+            update_response.raise_for_status()
+            updated_page = update_response.json()
+            
+            # Generate page URL
+            base_url = os.getenv("CONFLUENCE_URL", "").rstrip('/')
+            page_url = get_page_url_from_api_response(updated_page, base_url)
+            
+            return ReplaceTextPatternOutput(
+                success=True,
+                message=f"Successfully replaced {replacements_made} instances of '{inputs.search_pattern}'",
+                replacements_made=replacements_made,
+                changes_made=result.changes_made or [f"Replaced text pattern '{inputs.search_pattern}' with '{inputs.replacement}'"],
+                page_url=page_url,
+                backup_available=result.backup_content is not None
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in replace_text_pattern: {str(e)}")
+        raise ToolError(f"Failed to replace text pattern: {str(e)}")
+
+async def update_table_cell(inputs: UpdateTableCellInput) -> UpdateTableCellOutput:
+    """
+    Updates a specific cell in a table within a Confluence page with surgical precision.
+    
+    **Revolutionary Capability:** Direct table cell editing that preserves table structure,
+    formatting, and all surrounding content while modifying specific data points.
+    
+    **Use Cases:**
+    - Update status columns in project tables
+    - Modify data values in comparison tables
+    - Correct information in existing tables
+    - Update metrics and measurements
+    
+    **Examples:**
+    - Update first table, second row, third column: `{"page_id": "123456", "table_index": 0, "row_index": 1, "column_index": 2, "new_cell_content": "Completed"}`
+    - Update status cell: `{"page_id": "123456", "table_index": 0, "row_index": 2, "column_index": 1, "new_cell_content": "<strong>In Progress</strong>"}`
+    - Update with rich content: `{"page_id": "123456", "table_index": 1, "row_index": 0, "column_index": 0, "new_cell_content": "<a href=\"#\">Updated Link</a>"}`
+    
+    **Key Features:**
+    - Zero-based indexing for precise cell targeting
+    - Preserves table structure and formatting
+    - Supports rich HTML content in cells
+    - Maintains all other table data unchanged
+    - Automatic backup for rollback capability
+    
+    **Tips:**
+    - Use table_index to target specific tables when multiple exist
+    - Row and column indices start from 0
+    - Cell content can include HTML for formatting
+    - Table headers (th) and data cells (td) are both supported
+    """
+    try:
+        async with await get_confluence_client() as client:
+            # Get current page content
+            page_response = await client.get(f"/rest/api/content/{inputs.page_id}?expand=body.storage,version")
+            page_response.raise_for_status()
+            page_data = page_response.json()
+            
+            current_content = page_data['body']['storage']['value']
+            current_version = page_data['version']['number']
+            
+            # Initialize structural editor
+            structural_editor = StructuralEditor()
+            
+            # Perform table cell update
+            result = structural_editor.update_table_cell(
+                content=current_content,
+                table_index=inputs.table_index,
+                row_index=inputs.row_index,
+                column_index=inputs.column_index,
+                new_cell_content=inputs.new_cell_content
+            )
+            
+            if not result.success:
+                return UpdateTableCellOutput(
+                    success=False,
+                    message=f"Failed to update table cell: {result.error_message}",
+                    changes_made=[],
+                    backup_available=result.backup_content is not None
+                )
+            
+            # Update the page with modified content
+            update_data = {
+                "version": {"number": current_version + 1},
+                "body": {
+                    "storage": {
+                        "value": result.modified_content,
+                        "representation": "storage"
+                    }
+                }
+            }
+            
+            update_response = await client.put(f"/rest/api/content/{inputs.page_id}", json=update_data)
+            update_response.raise_for_status()
+            updated_page = update_response.json()
+            
+            # Generate page URL
+            base_url = os.getenv("CONFLUENCE_URL", "").rstrip('/')
+            page_url = get_page_url_from_api_response(updated_page, base_url)
+            
+            return UpdateTableCellOutput(
+                success=True,
+                message=f"Successfully updated table[{inputs.table_index}] cell at row {inputs.row_index}, column {inputs.column_index}",
+                changes_made=result.changes_made or [f"Updated table cell at [{inputs.row_index}, {inputs.column_index}]"],
+                page_url=page_url,
+                backup_available=result.backup_content is not None
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in update_table_cell: {str(e)}")
+        raise ToolError(f"Failed to update table cell: {str(e)}")
+
+# --- SELECTIVE EDITING DIRECT PARAMETER FUNCTIONS ---
+
+async def update_page_section_direct(
+    page_id: str,
+    heading: str,
+    new_content: str,
+    heading_level: Optional[int] = None,
+    exact_match: bool = False,
+    case_sensitive: bool = False
+) -> UpdatePageSectionOutput:
+    """Direct parameter version of update_page_section."""
+    inputs = UpdatePageSectionInput(
+        page_id=page_id,
+        heading=heading,
+        new_content=new_content,
+        heading_level=heading_level,
+        exact_match=exact_match,
+        case_sensitive=case_sensitive
+    )
+    return await update_page_section(inputs)
+
+async def replace_text_pattern_direct(
+    page_id: str,
+    search_pattern: str,
+    replacement: str,
+    case_sensitive: bool = False,
+    whole_words_only: bool = False,
+    max_replacements: Optional[int] = None
+) -> ReplaceTextPatternOutput:
+    """Direct parameter version of replace_text_pattern."""
+    inputs = ReplaceTextPatternInput(
+        page_id=page_id,
+        search_pattern=search_pattern,
+        replacement=replacement,
+        case_sensitive=case_sensitive,
+        whole_words_only=whole_words_only,
+        max_replacements=max_replacements
+    )
+    return await replace_text_pattern(inputs)
+
+async def update_table_cell_direct(
+    page_id: str,
+    table_index: int,
+    row_index: int,
+    column_index: int,
+    new_cell_content: str
+) -> UpdateTableCellOutput:
+    """Direct parameter version of update_table_cell."""
+    inputs = UpdateTableCellInput(
+        page_id=page_id,
+        table_index=table_index,
+        row_index=row_index,
+        column_index=column_index,
+        new_cell_content=new_cell_content
+    )
+    return await update_table_cell(inputs)
+
 # --- Conditional Tool Registration ---
 def register_schema_tools():
     """Register schema-based tools (legacy format with inputs wrapper)."""
@@ -1163,7 +1566,12 @@ def register_schema_tools():
     mcp_server.tool()(delete_page_attachment)
     mcp_server.tool()(get_page_comments)
     
-    logger.info("TOOL_REGISTRATION: Registered 10 schema-based tools")
+    # Register selective editing tools
+    mcp_server.tool()(update_page_section)
+    mcp_server.tool()(replace_text_pattern)
+    mcp_server.tool()(update_table_cell)
+    
+    logger.info("TOOL_REGISTRATION: Registered 13 schema-based tools (10 standard + 3 selective editing)")
 
 def register_direct_tools():
     """Register direct parameter tools (modern format)."""
@@ -1182,7 +1590,12 @@ def register_direct_tools():
     mcp_server.tool(name="delete_page_attachment")(delete_page_attachment_direct)
     mcp_server.tool(name="get_page_comments")(get_page_comments_direct)
     
-    logger.info("TOOL_REGISTRATION: Registered 10 direct parameter tools")
+    # Register selective editing tools
+    mcp_server.tool(name="update_page_section")(update_page_section_direct)
+    mcp_server.tool(name="replace_text_pattern")(replace_text_pattern_direct)
+    mcp_server.tool(name="update_table_cell")(update_table_cell_direct)
+    
+    logger.info("TOOL_REGISTRATION: Registered 13 direct parameter tools (10 standard + 3 selective editing)")
 
 def register_tools_conditionally():
     """Register tools based on detected calling convention."""
